@@ -1,0 +1,2 @@
+[console_scripts]
+main_controller = sudsakhon_mainprogram.main_controller:main

@@ -1,0 +1,2 @@
+[console_scripts]
+transformation = sudsakhon_transformation.tf_node:main

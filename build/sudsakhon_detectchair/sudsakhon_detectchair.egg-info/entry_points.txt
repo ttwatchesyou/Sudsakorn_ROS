@@ -1,0 +1,2 @@
+[console_scripts]
+subscriber = sudsakhon_detectchair.chair_subscriber:main

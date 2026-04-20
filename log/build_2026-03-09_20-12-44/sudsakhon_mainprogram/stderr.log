@@ -1,0 +1,5 @@
+  File "/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/lib/python3.12/site-packages/sudsakhon_mainprogram/main_controller.py", line 305
+    if self.sensors.box_detected == 0
+                                     ^
+SyntaxError: expected ':'
+

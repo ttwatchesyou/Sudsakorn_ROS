@@ -1,0 +1,2 @@
+[console_scripts]
+bridge_node = sudsakhon_automation.bridge_node:main

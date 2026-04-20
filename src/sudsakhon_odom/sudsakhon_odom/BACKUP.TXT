@@ -1,0 +1,181 @@
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import Twist, TransformStamped, PoseWithCovarianceStamped
+from nav_msgs.msg import Odometry
+import serial
+import time
+import threading
+import math
+from tf2_ros import TransformBroadcaster
+
+class SudsakhonOdomNode(Node):
+    def __init__(self):
+        super().__init__('sudsakhon_odom_node')
+        
+        # --- Config Serial ---
+        port_name = '/dev/Controller_Base' 
+        baud_rate = 115200
+        
+        # --- Physics Params ---
+        self.wheel_radius = 0.04 # รัศมีล้อหลัก 4 cm
+        self.rpm_to_rad = (2.0 * math.pi) / 60.0
+
+        try:
+            self.serial_port = serial.Serial(port_name, baud_rate, timeout=0.1)
+            time.sleep(2) 
+            self.get_logger().info(f"✅ STM32 Connected on {port_name}")
+        except Exception as e:
+            self.get_logger().error(f"❌ Serial Error: {e}")
+            raise SystemExit
+
+        # ดักฟังคำสั่งวิ่งจาก Nav2 ทุกๆ ชื่อ
+        self.create_subscription(Twist, '/cmd_vel', self.cmd_vel_cb, 10)
+        self.create_subscription(Twist, '/cmd_vel_nav', self.cmd_vel_cb, 10)
+        self.create_subscription(Twist, '/cmd_vel_smoothed', self.cmd_vel_cb, 10)
+        
+        self.create_subscription(PoseWithCovarianceStamped, '/initialpose', self.init_pose_cb, 10)
+        
+        self.odom_pub = self.create_publisher(Odometry, '/odom', 10)
+        self.tf_br = TransformBroadcaster(self)
+
+        # --- State ---
+        self.x = 0.0; self.y = 0.0; self.th = 0.0
+        self.prev_yaw = 0.0
+        self.yaw_offset = 0.0 
+        self.first_read = True 
+        self.last_time = self.get_clock().now()
+        
+        self.log_counter = 0
+
+        # Serial Thread
+        self.running = True
+        self.read_thread = threading.Thread(target=self.serial_loop, daemon=True)
+        self.read_thread.start()
+
+    def init_pose_cb(self, msg):
+        self.x = msg.pose.pose.position.x
+        self.y = msg.pose.pose.position.y
+        q = msg.pose.pose.orientation
+        target_yaw = math.atan2(2.0*(q.w*q.z + q.x*q.y), 1.0-2.0*(q.y*q.y + q.z*q.z))
+        
+        # คำนวณความต่างระหว่างมุมเริ่มต้นในแผนที่ กับมุมดิบของเซ็นเซอร์
+        self.yaw_offset = target_yaw - self.prev_yaw
+        self.get_logger().info(f"📍 Robot Calibrated! X:{self.x:.2f} Y:{self.y:.2f} Yaw:{target_yaw:.2f}")
+
+    def cmd_vel_cb(self, msg):
+        cmd = f"C{msg.linear.x:.3f}:{msg.linear.y:.3f}:{msg.angular.z:.3f}\n"
+        if self.serial_port.is_open:
+            self.serial_port.write(cmd.encode('utf-8'))
+            self.get_logger().info(f"🏎️ Nav2 CMD -> Vx: {msg.linear.x:.2f}, Vy: {msg.linear.y:.2f}, Wz: {msg.angular.z:.2f}")
+
+    def serial_loop(self):
+        while self.running:
+            if self.serial_port.in_waiting:
+                try:
+                    line = self.serial_port.readline().decode('utf-8', errors='ignore').strip()
+                    if line.startswith("FB:"):
+                        p = line.split(':')
+                        # ข้อมูลจาก STM32 ต้องมีอย่างน้อย 14 ฟิลด์
+                        if len(p) >= 14:
+                            rpm_fl = float(p[1])
+                            rpm_fr = float(p[2])
+                            rpm_rl = float(p[3])
+                            rpm_rr = float(p[4])
+                            raw_yaw = float(p[5])
+                            
+                            self.process_odom(rpm_fl, rpm_fr, rpm_rl, rpm_rr, raw_yaw)
+                except: pass
+            time.sleep(0.005)
+
+    def process_odom(self, rpm_fl, rpm_fr, rpm_rl, rpm_rr, raw_yaw):
+        now = self.get_clock().now()
+        if self.first_read:
+            self.prev_yaw = raw_yaw
+            self.last_time = now
+            self.first_read = False
+            return
+
+        dt = (now - self.last_time).nanoseconds / 1e9
+        if dt <= 0: return
+
+        # คำนวณความเร็ว X, Y จากล้อหลักทั้ง 4 ล้อ
+        v_fl = rpm_fl * self.rpm_to_rad * self.wheel_radius
+        v_fr = rpm_fr * self.rpm_to_rad * self.wheel_radius
+        v_rl = rpm_rl * self.rpm_to_rad * self.wheel_radius
+        v_rr = rpm_rr * self.rpm_to_rad * self.wheel_radius
+
+        # Mecanum Forward Kinematics (มุมมองล้อหุ่น)
+        vx_local = (v_fl + v_fr + v_rl + v_rr) / 4.0
+        vy_local = (-v_fl + v_fr + v_rl - v_rr) / 4.0
+        
+        # Yaw จากเซ็นเซอร์ BNO08x
+        dyaw = raw_yaw - self.prev_yaw
+        while dyaw > math.pi: dyaw -= 2*math.pi
+        while dyaw < -math.pi: dyaw += 2*math.pi
+        wz_local = dyaw / dt
+
+        dx_local = vx_local * dt
+        dy_local = vy_local * dt
+        
+        # ทิศทางจริงของหุ่นในแผนที่โลก (บวก offset ที่เกิดจาก RViz แล้ว)
+        self.th = raw_yaw + self.yaw_offset
+        
+        # อัปเดตพิกัด Global (X, Y ของโลก)
+        self.x += (dx_local * math.cos(self.th)) - (dy_local * math.sin(self.th))
+        self.y += (dx_local * math.sin(self.th)) + (dy_local * math.cos(self.th)) 
+
+        self.prev_yaw = raw_yaw
+        self.last_time = now
+
+        # =======================================================
+        # [จุดแก้ปัญหา] สร้าง Quaternion จาก self.th แทนการใช้ raw data
+        # เพื่อให้สมองกล Nav2 รับรู้ทิศทางหุ่นตรงกันกับระยะทางที่เดิน 100%
+        # =======================================================
+        q_z = math.sin(self.th / 2.0)
+        q_w = math.cos(self.th / 2.0)
+
+        # Broadcast TF
+        t = TransformStamped()
+        t.header.stamp = now.to_msg()
+        t.header.frame_id = 'odom'
+        t.child_frame_id = 'base_link'
+        t.transform.translation.x = self.x
+        t.transform.translation.y = self.y
+        t.transform.translation.z = 0.0
+        t.transform.rotation.x = 0.0
+        t.transform.rotation.y = 0.0
+        t.transform.rotation.z = q_z
+        t.transform.rotation.w = q_w
+        self.tf_br.sendTransform(t)
+
+        # Publish Odom
+        msg = Odometry()
+        msg.header = t.header
+        msg.child_frame_id = 'base_link'
+        msg.pose.pose.position.x = self.x
+        msg.pose.pose.position.y = self.y
+        msg.pose.pose.orientation = t.transform.rotation
+        
+        msg.twist.twist.linear.x = vx_local
+        msg.twist.twist.linear.y = vy_local
+        msg.twist.twist.angular.z = wz_local 
+        self.odom_pub.publish(msg)
+        
+        self.log_counter += 1
+        if self.log_counter % 20 == 0:
+            self.get_logger().info(f"📊 Odom Feedback -> Vx: {vx_local:.2f}, Vy: {vy_local:.2f}, Wz: {wz_local:.2f}")
+
+def main(args=None):
+    rclpy.init(args=args)
+    n = SudsakhonOdomNode()
+    try: rclpy.spin(n)
+    except KeyboardInterrupt: pass
+    finally:
+        n.running = False
+        if n.serial_port.is_open: 
+            n.serial_port.write(b"C0.0:0.0:0.0\n") 
+            n.serial_port.close()
+        n.destroy_node(); rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,35 @@
+running egg_info
+creating ../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info
+writing ../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info/PKG-INFO
+writing dependency_links to ../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info/dependency_links.txt
+writing entry points to ../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info/entry_points.txt
+writing requirements to ../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info/requires.txt
+writing top-level names to ../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info/top_level.txt
+writing manifest file '../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info/SOURCES.txt'
+reading manifest file '../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info/SOURCES.txt'
+writing manifest file '../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info/SOURCES.txt'
+running build
+running build_py
+creating /home/ubuntu/ros2_ws/build/sudsakhon_transformation/build
+creating /home/ubuntu/ros2_ws/build/sudsakhon_transformation/build/lib
+creating /home/ubuntu/ros2_ws/build/sudsakhon_transformation/build/lib/sudsakhon_transformation
+copying sudsakhon_transformation/tf_node.py -> /home/ubuntu/ros2_ws/build/sudsakhon_transformation/build/lib/sudsakhon_transformation
+copying sudsakhon_transformation/__init__.py -> /home/ubuntu/ros2_ws/build/sudsakhon_transformation/build/lib/sudsakhon_transformation
+running install
+running install_lib
+creating /home/ubuntu/ros2_ws/install/sudsakhon_transformation/lib/python3.12/site-packages/sudsakhon_transformation
+copying /home/ubuntu/ros2_ws/build/sudsakhon_transformation/build/lib/sudsakhon_transformation/tf_node.py -> /home/ubuntu/ros2_ws/install/sudsakhon_transformation/lib/python3.12/site-packages/sudsakhon_transformation
+copying /home/ubuntu/ros2_ws/build/sudsakhon_transformation/build/lib/sudsakhon_transformation/__init__.py -> /home/ubuntu/ros2_ws/install/sudsakhon_transformation/lib/python3.12/site-packages/sudsakhon_transformation
+byte-compiling /home/ubuntu/ros2_ws/install/sudsakhon_transformation/lib/python3.12/site-packages/sudsakhon_transformation/tf_node.py to tf_node.cpython-312.pyc
+byte-compiling /home/ubuntu/ros2_ws/install/sudsakhon_transformation/lib/python3.12/site-packages/sudsakhon_transformation/__init__.py to __init__.cpython-312.pyc
+running install_data
+creating /home/ubuntu/ros2_ws/install/sudsakhon_transformation/share/ament_index
+creating /home/ubuntu/ros2_ws/install/sudsakhon_transformation/share/ament_index/resource_index
+creating /home/ubuntu/ros2_ws/install/sudsakhon_transformation/share/ament_index/resource_index/packages
+copying resource/sudsakhon_transformation -> /home/ubuntu/ros2_ws/install/sudsakhon_transformation/share/ament_index/resource_index/packages
+copying package.xml -> /home/ubuntu/ros2_ws/install/sudsakhon_transformation/share/sudsakhon_transformation
+running install_egg_info
+Copying ../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info to /home/ubuntu/ros2_ws/install/sudsakhon_transformation/lib/python3.12/site-packages/sudsakhon_transformation-0.0.0-py3.12.egg-info
+running install_scripts
+Installing transformation script to /home/ubuntu/ros2_ws/install/sudsakhon_transformation/lib/sudsakhon_transformation
+writing list of installed files to '/home/ubuntu/ros2_ws/build/sudsakhon_transformation/install.log'
