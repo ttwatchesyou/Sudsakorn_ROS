@@ -1,0 +1,6 @@
+Metadata-Version: 2.1
+Name: sudsakhon-dashbroad
+Version: 0.0.1
+Summary: ROS2 Dashboard for systemd service monitoring
+Maintainer: Sudsakhon User
+License: Apache License 2.0

@@ -1,0 +1,6 @@
+source;share/sudsakhon_dashbroad/hook/pythonpath.ps1
+source;share/sudsakhon_dashbroad/hook/pythonpath.dsv
+source;share/sudsakhon_dashbroad/hook/pythonpath.sh
+source;share/sudsakhon_dashbroad/hook/ament_prefix_path.ps1
+source;share/sudsakhon_dashbroad/hook/ament_prefix_path.dsv
+source;share/sudsakhon_dashbroad/hook/ament_prefix_path.sh

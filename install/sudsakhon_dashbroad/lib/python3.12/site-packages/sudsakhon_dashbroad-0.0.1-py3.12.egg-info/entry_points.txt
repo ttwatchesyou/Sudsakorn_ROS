@@ -1,0 +1,3 @@
+[console_scripts]
+api_backend = sudsakhon_dashbroad.api_backend:main
+dashboard_node = sudsakhon_dashbroad.dashboard_node:main

@@ -16,71 +16,73 @@ class SudsakhonBroadcaster(Node):
         self.pub = self.create_publisher(Time, 'ros_time', QoSProfile(depth=10))
         self.timer = self.create_timer(0.1, self.broadcast_tf)
   
-        # --- Updated Dimensions based on User Input (22.8, 18.85, 0) ---
+        # --- Robot Dimensions ---
         total_length_x = 0.456
         total_width_y = 0.377
         
         # Half-width and half-length from robot center (base_link)
-        half_length = total_length_x / 2  # 0.114m
-        half_width = total_width_y / 2    # 0.09425m
+        half_length = total_length_x / 2  # 0.228m
+        half_width = total_width_y / 2    # 0.1885m
         
-        # Wheel positions (X = forward/back, Y = left/right, Z = up/down)
-        # m1 = Front Left
+        # Wheel positions (m1:FL, m2:FR, m3:BL, m4:BR)
         self.wheel_fl_x = half_length    
         self.wheel_fl_y = half_width     
-        
-        # m2 = Front Right
         self.wheel_fr_x = half_length    
         self.wheel_fr_y = -half_width    
-        
-        # m3 = Back Left
         self.wheel_bl_x = -half_length   
         self.wheel_bl_y = half_width     
-        
-        # m4 = Back Right
         self.wheel_br_x = -half_length   
         self.wheel_br_y = -half_width    
-        
-        # Wheel height (Z-axis) 
         self.wheel_z = 0.00  
 
-        # --- New Lidar Configuration: laser_base ---
-        # Position provided: 22.8, 11.25, 11.4 (cm)
-        self.laser_base_x = 0  
-        self.laser_base_y = 0.1125 
+        # --- Lidar Configuration: laser_base ---
+        self.laser_base_x = 0.1125  
+        self.laser_base_y = 0.0 
         self.laser_base_z = 0.114  
+
+        # --- Lidar Configuration: laser_chair ---
+        self.laser_chair_x = -0.082
+        self.laser_chair_y = 0
+        self.laser_chair_z = 0.7705
+
+        # --- Camera Configuration: orbbec ---
+        # Position provided: 30.45, 90.4, 0 (cm) -> 0.3045, 0.904, 0.0 (m)
+        self.orbbec_x = 0.3125
+        self.orbbec_y = 0
+        self.orbbec_z = 0.90
         
         self.get_logger().info(f"[Brobot][TF] Configured with X: {total_length_x}m, Y: {total_width_y}m")
-        self.get_logger().info(f"[Brobot][TF] New Lidar 'laser_base' at: {self.laser_base_x}, {self.laser_base_y}, {self.laser_base_z}")
+        self.get_logger().info(f"[Brobot][TF] Lidar 'laser_base' at: {self.laser_base_x}, {self.laser_base_y}, {self.laser_base_z}")
+        self.get_logger().info(f"[Brobot][TF] Lidar 'laser_chair' at: {self.laser_chair_x}, {self.laser_chair_y}, {self.laser_chair_z}")
+        self.get_logger().info(f"[Brobot][TF] Camera 'Camera_Orbbec' at: {self.orbbec_x}, {self.orbbec_y}, {self.orbbec_z}")
 
     def broadcast_tf(self):
         now = self.get_clock().now().to_msg()
 
-        # 1. New Base Lidar (laser_base)
+        # 1. Base Lidar (laser_base)
         self.send_transform(now, 'base_link', 'laser_base', 
                           self.laser_base_x, self.laser_base_y, self.laser_base_z, 
                           0.0, 0.0, 0.0)
 
-        # 2. Mecanum Wheels
-        # Front Left
+        # 2. Chair Lidar (laser_chair)
+        self.send_transform(now, 'base_link', 'laser_chair',
+                          self.laser_chair_x, self.laser_chair_y, self.laser_chair_z,
+                          0.0, 0.0, 0.0)
+
+        # 3. Camera Sensor (orbbec)
+        self.send_transform(now, 'base_link', 'orbbec',
+                          self.orbbec_x, self.orbbec_y, self.orbbec_z,
+                          0.0, 0.0, 0.0)
+
+        # 4. Mecanum Wheels
         self.send_transform(now, 'base_link', 'wheel_front_left', 
-                          self.wheel_fl_x, self.wheel_fl_y, self.wheel_z, 
-                          0.0, 0.0, 0.0)
-        
-        # Front Right
+                          self.wheel_fl_x, self.wheel_fl_y, self.wheel_z, 0.0, 0.0, 0.0)
         self.send_transform(now, 'base_link', 'wheel_front_right', 
-                          self.wheel_fr_x, self.wheel_fr_y, self.wheel_z, 
-                          0.0, 0.0, 0.0)
-        
-        # Back Left
+                          self.wheel_fr_x, self.wheel_fr_y, self.wheel_z, 0.0, 0.0, 0.0)
         self.send_transform(now, 'base_link', 'wheel_back_left', 
-                          self.wheel_bl_x, self.wheel_bl_y, self.wheel_z, 
-                          0.0, 0.0, 0.0)
-        
-        # Back Right
+                          self.wheel_bl_x, self.wheel_bl_y, self.wheel_z, 0.0, 0.0, 0.0)
         self.send_transform(now, 'base_link', 'wheel_back_right', 
-                          self.wheel_br_x, self.wheel_br_y, self.wheel_z, 
-                          0.0, 0.0, 0.0)
+                          self.wheel_br_x, self.wheel_br_y, self.wheel_z, 0.0, 0.0, 0.0)
 
         self.pub.publish(now)
 

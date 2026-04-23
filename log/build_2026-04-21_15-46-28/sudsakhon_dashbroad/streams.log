@@ -1,0 +1,37 @@
+[0.499s] Invoking command in '/home/ubuntu/ros2_ws/src/sudsakhon_dashbroad': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_dashbroad build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/install.log --single-version-externally-managed install_data
+[0.650s] running egg_info
+[0.651s] creating ../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info
+[0.660s] writing ../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info/PKG-INFO
+[0.660s] writing dependency_links to ../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info/dependency_links.txt
+[0.660s] writing entry points to ../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info/entry_points.txt
+[0.660s] writing requirements to ../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info/requires.txt
+[0.661s] writing top-level names to ../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info/top_level.txt
+[0.661s] writing manifest file '../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info/SOURCES.txt'
+[0.680s] reading manifest file '../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info/SOURCES.txt'
+[0.680s] writing manifest file '../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info/SOURCES.txt'
+[0.680s] running build
+[0.680s] running build_py
+[0.680s] creating /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build
+[0.681s] creating /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build/lib
+[0.681s] creating /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build/lib/sudsakhon_dashbroad
+[0.681s] copying sudsakhon_dashbroad/dashboard_node.py -> /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build/lib/sudsakhon_dashbroad
+[0.681s] copying sudsakhon_dashbroad/__init__.py -> /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build/lib/sudsakhon_dashbroad
+[0.681s] running install
+[0.684s] running install_lib
+[0.695s] creating /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages/sudsakhon_dashbroad
+[0.695s] copying /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build/lib/sudsakhon_dashbroad/dashboard_node.py -> /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages/sudsakhon_dashbroad
+[0.695s] copying /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build/lib/sudsakhon_dashbroad/__init__.py -> /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages/sudsakhon_dashbroad
+[0.696s] byte-compiling /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages/sudsakhon_dashbroad/dashboard_node.py to dashboard_node.cpython-312.pyc
+[0.697s] byte-compiling /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages/sudsakhon_dashbroad/__init__.py to __init__.cpython-312.pyc
+[0.697s] running install_data
+[0.697s] creating /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/ament_index
+[0.697s] creating /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/ament_index/resource_index
+[0.697s] creating /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/ament_index/resource_index/packages
+[0.697s] copying resource/sudsakhon_dashbroad -> /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/ament_index/resource_index/packages
+[0.697s] copying package.xml -> /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/sudsakhon_dashbroad
+[0.697s] running install_egg_info
+[0.707s] Copying ../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info to /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages/sudsakhon_dashbroad-0.0.1-py3.12.egg-info
+[0.708s] running install_scripts
+[0.779s] Installing dashboard_node script to /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/sudsakhon_dashbroad
+[0.779s] writing list of installed files to '/home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/install.log'
+[0.795s] Invoked command in '/home/ubuntu/ros2_ws/src/sudsakhon_dashbroad' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_dashbroad build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/install.log --single-version-externally-managed install_data
