@@ -1,0 +1,39 @@
+running egg_info
+creating ../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info
+writing ../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info/PKG-INFO
+writing dependency_links to ../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info/dependency_links.txt
+writing entry points to ../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info/entry_points.txt
+writing requirements to ../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info/requires.txt
+writing top-level names to ../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info/top_level.txt
+writing manifest file '../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info/SOURCES.txt'
+reading manifest file '../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info/SOURCES.txt'
+writing manifest file '../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info/SOURCES.txt'
+running build
+running build_py
+creating /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build
+creating /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build/lib
+creating /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build/lib/sudsakhon_dashbroad
+copying sudsakhon_dashbroad/dashboard_node.py -> /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build/lib/sudsakhon_dashbroad
+copying sudsakhon_dashbroad/__init__.py -> /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build/lib/sudsakhon_dashbroad
+copying sudsakhon_dashbroad/api_backend.py -> /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build/lib/sudsakhon_dashbroad
+running install
+running install_lib
+creating /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages/sudsakhon_dashbroad
+copying /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build/lib/sudsakhon_dashbroad/dashboard_node.py -> /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages/sudsakhon_dashbroad
+copying /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build/lib/sudsakhon_dashbroad/__init__.py -> /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages/sudsakhon_dashbroad
+copying /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build/lib/sudsakhon_dashbroad/api_backend.py -> /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages/sudsakhon_dashbroad
+byte-compiling /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages/sudsakhon_dashbroad/dashboard_node.py to dashboard_node.cpython-312.pyc
+byte-compiling /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages/sudsakhon_dashbroad/__init__.py to __init__.cpython-312.pyc
+byte-compiling /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages/sudsakhon_dashbroad/api_backend.py to api_backend.cpython-312.pyc
+running install_data
+creating /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/ament_index
+creating /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/ament_index/resource_index
+creating /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/ament_index/resource_index/packages
+copying resource/sudsakhon_dashbroad -> /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/ament_index/resource_index/packages
+copying package.xml -> /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/sudsakhon_dashbroad
+running install_egg_info
+Copying ../../build/sudsakhon_dashbroad/sudsakhon_dashbroad.egg-info to /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages/sudsakhon_dashbroad-0.0.1-py3.12.egg-info
+running install_scripts
+Installing api_backend script to /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/sudsakhon_dashbroad
+Installing dashboard_node script to /home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/sudsakhon_dashbroad
+writing list of installed files to '/home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/install.log'

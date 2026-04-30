@@ -1,0 +1,21 @@
+[1.385s] Invoking command in '/home/ubuntu/ros2_ws/src/sudsakhon_objectdetechtion': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_objectdetechtion/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_objectdetechtion/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_objectdetechtion build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_objectdetechtion/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_objectdetechtion/install.log --single-version-externally-managed install_data
+[1.582s] running egg_info
+[1.595s] writing ../../build/sudsakhon_objectdetechtion/sudsakhon_objectdetechtion.egg-info/PKG-INFO
+[1.595s] writing dependency_links to ../../build/sudsakhon_objectdetechtion/sudsakhon_objectdetechtion.egg-info/dependency_links.txt
+[1.596s] writing entry points to ../../build/sudsakhon_objectdetechtion/sudsakhon_objectdetechtion.egg-info/entry_points.txt
+[1.596s] writing requirements to ../../build/sudsakhon_objectdetechtion/sudsakhon_objectdetechtion.egg-info/requires.txt
+[1.596s] writing top-level names to ../../build/sudsakhon_objectdetechtion/sudsakhon_objectdetechtion.egg-info/top_level.txt
+[1.624s] reading manifest file '../../build/sudsakhon_objectdetechtion/sudsakhon_objectdetechtion.egg-info/SOURCES.txt'
+[1.625s] writing manifest file '../../build/sudsakhon_objectdetechtion/sudsakhon_objectdetechtion.egg-info/SOURCES.txt'
+[1.625s] running build
+[1.625s] running build_py
+[1.625s] running install
+[1.630s] running install_lib
+[1.644s] running install_data
+[1.644s] running install_egg_info
+[1.659s] removing '/home/ubuntu/ros2_ws/install/sudsakhon_objectdetechtion/lib/python3.12/site-packages/sudsakhon_objectdetechtion-0.0.0-py3.12.egg-info' (and everything under it)
+[1.659s] Copying ../../build/sudsakhon_objectdetechtion/sudsakhon_objectdetechtion.egg-info to /home/ubuntu/ros2_ws/install/sudsakhon_objectdetechtion/lib/python3.12/site-packages/sudsakhon_objectdetechtion-0.0.0-py3.12.egg-info
+[1.660s] running install_scripts
+[1.793s] Installing yolo_depth_pub script to /home/ubuntu/ros2_ws/install/sudsakhon_objectdetechtion/lib/sudsakhon_objectdetechtion
+[1.794s] writing list of installed files to '/home/ubuntu/ros2_ws/build/sudsakhon_objectdetechtion/install.log'
+[1.853s] Invoked command in '/home/ubuntu/ros2_ws/src/sudsakhon_objectdetechtion' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_objectdetechtion/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_objectdetechtion/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_objectdetechtion build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_objectdetechtion/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_objectdetechtion/install.log --single-version-externally-managed install_data

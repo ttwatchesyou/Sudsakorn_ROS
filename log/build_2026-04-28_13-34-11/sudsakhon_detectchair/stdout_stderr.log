@@ -1,0 +1,22 @@
+running egg_info
+writing ../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info/PKG-INFO
+writing dependency_links to ../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info/dependency_links.txt
+writing entry points to ../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info/entry_points.txt
+writing requirements to ../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info/requires.txt
+writing top-level names to ../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info/top_level.txt
+reading manifest file '../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info/SOURCES.txt'
+writing manifest file '../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info/SOURCES.txt'
+running build
+running build_py
+copying sudsakhon_detectchair/chair_subscriber.py -> /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/build/lib/sudsakhon_detectchair
+running install
+running install_lib
+copying /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/build/lib/sudsakhon_detectchair/chair_subscriber.py -> /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/python3.12/site-packages/sudsakhon_detectchair
+byte-compiling /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/python3.12/site-packages/sudsakhon_detectchair/chair_subscriber.py to chair_subscriber.cpython-312.pyc
+running install_data
+running install_egg_info
+removing '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/python3.12/site-packages/sudsakhon_detectchair-0.0.0-py3.12.egg-info' (and everything under it)
+Copying ../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info to /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/python3.12/site-packages/sudsakhon_detectchair-0.0.0-py3.12.egg-info
+running install_scripts
+Installing subscriber script to /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/sudsakhon_detectchair
+writing list of installed files to '/home/ubuntu/ros2_ws/build/sudsakhon_detectchair/install.log'

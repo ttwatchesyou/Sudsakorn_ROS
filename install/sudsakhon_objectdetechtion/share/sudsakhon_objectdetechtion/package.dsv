@@ -1,0 +1,6 @@
+source;share/sudsakhon_objectdetechtion/hook/pythonpath.ps1
+source;share/sudsakhon_objectdetechtion/hook/pythonpath.dsv
+source;share/sudsakhon_objectdetechtion/hook/pythonpath.sh
+source;share/sudsakhon_objectdetechtion/hook/ament_prefix_path.ps1
+source;share/sudsakhon_objectdetechtion/hook/ament_prefix_path.dsv
+source;share/sudsakhon_objectdetechtion/hook/ament_prefix_path.sh

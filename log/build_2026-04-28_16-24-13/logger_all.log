@@ -1,0 +1,442 @@
+[0.065s] DEBUG:colcon:Command line arguments: ['/usr/bin/colcon', 'build']
+[0.065s] DEBUG:colcon:Parsed command line arguments: Namespace(log_base=None, log_level=None, verb_name='build', build_base='build', install_base='install', merge_install=False, symlink_install=False, test_result_base=None, continue_on_error=False, executor='parallel', parallel_workers=12, event_handlers=None, ignore_user_meta=False, metas=['./colcon.meta'], base_paths=['.'], packages_ignore=None, packages_ignore_regex=None, paths=None, packages_up_to=None, packages_up_to_regex=None, packages_above=None, packages_above_and_dependencies=None, packages_above_depth=None, packages_select_by_dep=None, packages_skip_by_dep=None, packages_skip_up_to=None, packages_select_build_failed=False, packages_skip_build_finished=False, packages_select_test_failures=False, packages_skip_test_passed=False, packages_select=None, packages_skip=None, packages_select_regex=None, packages_skip_regex=None, packages_start=None, packages_end=None, allow_overriding=[], cmake_args=None, cmake_target=None, cmake_target_skip_unavailable=False, cmake_clean_cache=False, cmake_clean_first=False, cmake_force_configure=False, ament_cmake_args=None, catkin_cmake_args=None, catkin_skip_building_tests=False, mixin_files=None, mixin=None, verb_parser=<colcon_mixin.mixin.mixin_argument.MixinArgumentDecorator object at 0x79236a6c4e90>, verb_extension=<colcon_core.verb.build.BuildVerb object at 0x79236a6c4bc0>, main=<bound method BuildVerb.main of <colcon_core.verb.build.BuildVerb object at 0x79236a6c4bc0>>, mixin_verb=('build',))
+[0.086s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) check parameters
+[0.086s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) check parameters
+[0.086s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) check parameters
+[0.086s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) check parameters
+[0.086s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) discover
+[0.086s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) discover
+[0.086s] INFO:colcon.colcon_core.package_discovery:Crawling recursively for packages in '/home/ubuntu/ros2_ws'
+[0.086s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ignore', 'ignore_ament_install']
+[0.086s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore'
+[0.086s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore_ament_install'
+[0.087s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_pkg']
+[0.087s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_pkg'
+[0.087s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_meta']
+[0.087s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_meta'
+[0.087s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ros']
+[0.087s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ros'
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['cmake', 'python']
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'cmake'
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python'
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['python_setup_py']
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python_setup_py'
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extensions ['ignore', 'ignore_ament_install']
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extension 'ignore'
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(build) ignored
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extensions ['ignore', 'ignore_ament_install']
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extension 'ignore'
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(install) ignored
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extensions ['ignore', 'ignore_ament_install']
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extension 'ignore'
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(log) ignored
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['ignore', 'ignore_ament_install']
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'ignore'
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'ignore_ament_install'
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['colcon_pkg']
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'colcon_pkg'
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['colcon_meta']
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'colcon_meta'
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['ros']
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'ros'
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['cmake', 'python']
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'cmake'
+[0.101s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'python'
+[0.102s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['python_setup_py']
+[0.102s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'python_setup_py'
+[0.102s] Level 1:colcon.colcon_core.package_identification:_identify(src/sllidar_ros2) by extensions ['ignore', 'ignore_ament_install']
+[0.102s] Level 1:colcon.colcon_core.package_identification:_identify(src/sllidar_ros2) by extension 'ignore'
+[0.102s] Level 1:colcon.colcon_core.package_identification:_identify(src/sllidar_ros2) by extension 'ignore_ament_install'
+[0.102s] Level 1:colcon.colcon_core.package_identification:_identify(src/sllidar_ros2) by extensions ['colcon_pkg']
+[0.102s] Level 1:colcon.colcon_core.package_identification:_identify(src/sllidar_ros2) by extension 'colcon_pkg'
+[0.102s] Level 1:colcon.colcon_core.package_identification:_identify(src/sllidar_ros2) by extensions ['colcon_meta']
+[0.102s] Level 1:colcon.colcon_core.package_identification:_identify(src/sllidar_ros2) by extension 'colcon_meta'
+[0.102s] Level 1:colcon.colcon_core.package_identification:_identify(src/sllidar_ros2) by extensions ['ros']
+[0.102s] Level 1:colcon.colcon_core.package_identification:_identify(src/sllidar_ros2) by extension 'ros'
+[0.103s] DEBUG:colcon.colcon_core.package_identification:Package 'src/sllidar_ros2' with type 'ros.ament_cmake' and name 'sllidar_ros2'
+[0.103s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_automation) by extensions ['ignore', 'ignore_ament_install']
+[0.103s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_automation) by extension 'ignore'
+[0.103s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_automation) by extension 'ignore_ament_install'
+[0.103s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_automation) by extensions ['colcon_pkg']
+[0.103s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_automation) by extension 'colcon_pkg'
+[0.103s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_automation) by extensions ['colcon_meta']
+[0.103s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_automation) by extension 'colcon_meta'
+[0.103s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_automation) by extensions ['ros']
+[0.103s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_automation) by extension 'ros'
+[0.103s] DEBUG:colcon.colcon_core.package_identification:Package 'src/sudsakhon_automation' with type 'ros.ament_python' and name 'sudsakhon_automation'
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_dashbroad) by extensions ['ignore', 'ignore_ament_install']
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_dashbroad) by extension 'ignore'
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_dashbroad) by extension 'ignore_ament_install'
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_dashbroad) by extensions ['colcon_pkg']
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_dashbroad) by extension 'colcon_pkg'
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_dashbroad) by extensions ['colcon_meta']
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_dashbroad) by extension 'colcon_meta'
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_dashbroad) by extensions ['ros']
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_dashbroad) by extension 'ros'
+[0.104s] DEBUG:colcon.colcon_core.package_identification:Package 'src/sudsakhon_dashbroad' with type 'ros.ament_python' and name 'sudsakhon_dashbroad'
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_detectchair) by extensions ['ignore', 'ignore_ament_install']
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_detectchair) by extension 'ignore'
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_detectchair) by extension 'ignore_ament_install'
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_detectchair) by extensions ['colcon_pkg']
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_detectchair) by extension 'colcon_pkg'
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_detectchair) by extensions ['colcon_meta']
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_detectchair) by extension 'colcon_meta'
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_detectchair) by extensions ['ros']
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_detectchair) by extension 'ros'
+[0.104s] DEBUG:colcon.colcon_core.package_identification:Package 'src/sudsakhon_detectchair' with type 'ros.ament_python' and name 'sudsakhon_detectchair'
+[0.104s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_mainprogram) by extensions ['ignore', 'ignore_ament_install']
+[0.105s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_mainprogram) by extension 'ignore'
+[0.105s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_mainprogram) by extension 'ignore_ament_install'
+[0.105s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_mainprogram) by extensions ['colcon_pkg']
+[0.105s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_mainprogram) by extension 'colcon_pkg'
+[0.105s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_mainprogram) by extensions ['colcon_meta']
+[0.105s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_mainprogram) by extension 'colcon_meta'
+[0.105s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_mainprogram) by extensions ['ros']
+[0.105s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_mainprogram) by extension 'ros'
+[0.105s] DEBUG:colcon.colcon_core.package_identification:Package 'src/sudsakhon_mainprogram' with type 'ros.ament_python' and name 'sudsakhon_mainprogram'
+[0.105s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_odom) by extensions ['ignore', 'ignore_ament_install']
+[0.105s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_odom) by extension 'ignore'
+[0.105s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_odom) by extension 'ignore_ament_install'
+[0.105s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_odom) by extensions ['colcon_pkg']
+[0.105s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_odom) by extension 'colcon_pkg'
+[0.105s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_odom) by extensions ['colcon_meta']
+[0.105s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_odom) by extension 'colcon_meta'
+[0.105s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_odom) by extensions ['ros']
+[0.105s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_odom) by extension 'ros'
+[0.105s] DEBUG:colcon.colcon_core.package_identification:Package 'src/sudsakhon_odom' with type 'ros.ament_python' and name 'sudsakhon_odom'
+[0.106s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_transformation) by extensions ['ignore', 'ignore_ament_install']
+[0.106s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_transformation) by extension 'ignore'
+[0.106s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_transformation) by extension 'ignore_ament_install'
+[0.106s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_transformation) by extensions ['colcon_pkg']
+[0.106s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_transformation) by extension 'colcon_pkg'
+[0.106s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_transformation) by extensions ['colcon_meta']
+[0.106s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_transformation) by extension 'colcon_meta'
+[0.106s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_transformation) by extensions ['ros']
+[0.106s] Level 1:colcon.colcon_core.package_identification:_identify(src/sudsakhon_transformation) by extension 'ros'
+[0.106s] DEBUG:colcon.colcon_core.package_identification:Package 'src/sudsakhon_transformation' with type 'ros.ament_python' and name 'sudsakhon_transformation'
+[0.106s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) using defaults
+[0.106s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) discover
+[0.106s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) using defaults
+[0.106s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) discover
+[0.106s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) using defaults
+[0.117s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) check parameters
+[0.117s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) discover
+[0.119s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 7 installed packages in /home/ubuntu/ros2_ws/install
+[0.121s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 99 installed packages in /home/ubuntu/install
+[0.121s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 288 installed packages in /opt/ros/jazzy
+[0.123s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) using defaults
+[0.143s] Level 5:colcon.colcon_core.verb:set package 'sllidar_ros2' build argument 'cmake_args' from command line to 'None'
+[0.143s] Level 5:colcon.colcon_core.verb:set package 'sllidar_ros2' build argument 'cmake_target' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sllidar_ros2' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sllidar_ros2' build argument 'cmake_clean_cache' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sllidar_ros2' build argument 'cmake_clean_first' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sllidar_ros2' build argument 'cmake_force_configure' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sllidar_ros2' build argument 'ament_cmake_args' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sllidar_ros2' build argument 'catkin_cmake_args' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sllidar_ros2' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.144s] DEBUG:colcon.colcon_core.verb:Building package 'sllidar_ros2' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/ubuntu/ros2_ws/build/sllidar_ros2', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/ubuntu/ros2_ws/install/sllidar_ros2', 'merge_install': False, 'path': '/home/ubuntu/ros2_ws/src/sllidar_ros2', 'symlink_install': False, 'test_result_base': None}
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_automation' build argument 'cmake_args' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_automation' build argument 'cmake_target' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_automation' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_automation' build argument 'cmake_clean_cache' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_automation' build argument 'cmake_clean_first' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_automation' build argument 'cmake_force_configure' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_automation' build argument 'ament_cmake_args' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_automation' build argument 'catkin_cmake_args' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_automation' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.144s] DEBUG:colcon.colcon_core.verb:Building package 'sudsakhon_automation' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/ubuntu/ros2_ws/build/sudsakhon_automation', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/ubuntu/ros2_ws/install/sudsakhon_automation', 'merge_install': False, 'path': '/home/ubuntu/ros2_ws/src/sudsakhon_automation', 'symlink_install': False, 'test_result_base': None}
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_dashbroad' build argument 'cmake_args' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_dashbroad' build argument 'cmake_target' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_dashbroad' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_dashbroad' build argument 'cmake_clean_cache' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_dashbroad' build argument 'cmake_clean_first' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_dashbroad' build argument 'cmake_force_configure' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_dashbroad' build argument 'ament_cmake_args' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_dashbroad' build argument 'catkin_cmake_args' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_dashbroad' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.144s] DEBUG:colcon.colcon_core.verb:Building package 'sudsakhon_dashbroad' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/ubuntu/ros2_ws/build/sudsakhon_dashbroad', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad', 'merge_install': False, 'path': '/home/ubuntu/ros2_ws/src/sudsakhon_dashbroad', 'symlink_install': False, 'test_result_base': None}
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_detectchair' build argument 'cmake_args' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_detectchair' build argument 'cmake_target' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_detectchair' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_detectchair' build argument 'cmake_clean_cache' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_detectchair' build argument 'cmake_clean_first' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_detectchair' build argument 'cmake_force_configure' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_detectchair' build argument 'ament_cmake_args' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_detectchair' build argument 'catkin_cmake_args' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_detectchair' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.144s] DEBUG:colcon.colcon_core.verb:Building package 'sudsakhon_detectchair' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/ubuntu/ros2_ws/build/sudsakhon_detectchair', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair', 'merge_install': False, 'path': '/home/ubuntu/ros2_ws/src/sudsakhon_detectchair', 'symlink_install': False, 'test_result_base': None}
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_mainprogram' build argument 'cmake_args' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_mainprogram' build argument 'cmake_target' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_mainprogram' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_mainprogram' build argument 'cmake_clean_cache' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_mainprogram' build argument 'cmake_clean_first' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_mainprogram' build argument 'cmake_force_configure' from command line to 'False'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_mainprogram' build argument 'ament_cmake_args' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_mainprogram' build argument 'catkin_cmake_args' from command line to 'None'
+[0.144s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_mainprogram' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.144s] DEBUG:colcon.colcon_core.verb:Building package 'sudsakhon_mainprogram' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/ubuntu/ros2_ws/build/sudsakhon_mainprogram', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram', 'merge_install': False, 'path': '/home/ubuntu/ros2_ws/src/sudsakhon_mainprogram', 'symlink_install': False, 'test_result_base': None}
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_odom' build argument 'cmake_args' from command line to 'None'
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_odom' build argument 'cmake_target' from command line to 'None'
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_odom' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_odom' build argument 'cmake_clean_cache' from command line to 'False'
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_odom' build argument 'cmake_clean_first' from command line to 'False'
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_odom' build argument 'cmake_force_configure' from command line to 'False'
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_odom' build argument 'ament_cmake_args' from command line to 'None'
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_odom' build argument 'catkin_cmake_args' from command line to 'None'
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_odom' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.145s] DEBUG:colcon.colcon_core.verb:Building package 'sudsakhon_odom' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/ubuntu/ros2_ws/build/sudsakhon_odom', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/ubuntu/ros2_ws/install/sudsakhon_odom', 'merge_install': False, 'path': '/home/ubuntu/ros2_ws/src/sudsakhon_odom', 'symlink_install': False, 'test_result_base': None}
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_transformation' build argument 'cmake_args' from command line to 'None'
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_transformation' build argument 'cmake_target' from command line to 'None'
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_transformation' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_transformation' build argument 'cmake_clean_cache' from command line to 'False'
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_transformation' build argument 'cmake_clean_first' from command line to 'False'
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_transformation' build argument 'cmake_force_configure' from command line to 'False'
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_transformation' build argument 'ament_cmake_args' from command line to 'None'
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_transformation' build argument 'catkin_cmake_args' from command line to 'None'
+[0.145s] Level 5:colcon.colcon_core.verb:set package 'sudsakhon_transformation' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.145s] DEBUG:colcon.colcon_core.verb:Building package 'sudsakhon_transformation' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/ubuntu/ros2_ws/build/sudsakhon_transformation', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/ubuntu/ros2_ws/install/sudsakhon_transformation', 'merge_install': False, 'path': '/home/ubuntu/ros2_ws/src/sudsakhon_transformation', 'symlink_install': False, 'test_result_base': None}
+[0.145s] INFO:colcon.colcon_core.executor:Executing jobs using 'parallel' executor
+[0.146s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete
+[0.146s] INFO:colcon.colcon_ros.task.ament_cmake.build:Building ROS package in '/home/ubuntu/ros2_ws/src/sllidar_ros2' with build type 'ament_cmake'
+[0.146s] INFO:colcon.colcon_cmake.task.cmake.build:Building CMake package in '/home/ubuntu/ros2_ws/src/sllidar_ros2'
+[0.147s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_core.shell.bat': Not used on non-Windows systems
+[0.147s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.147s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.151s] INFO:colcon.colcon_ros.task.ament_python.build:Building ROS package in '/home/ubuntu/ros2_ws/src/sudsakhon_automation' with build type 'ament_python'
+[0.151s] Level 1:colcon.colcon_core.shell:create_environment_hook('sudsakhon_automation', 'ament_prefix_path')
+[0.151s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_automation/share/sudsakhon_automation/hook/ament_prefix_path.ps1'
+[0.152s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_automation/share/sudsakhon_automation/hook/ament_prefix_path.dsv'
+[0.152s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_automation/share/sudsakhon_automation/hook/ament_prefix_path.sh'
+[0.152s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.152s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.156s] INFO:colcon.colcon_ros.task.ament_python.build:Building ROS package in '/home/ubuntu/ros2_ws/src/sudsakhon_dashbroad' with build type 'ament_python'
+[0.156s] Level 1:colcon.colcon_core.shell:create_environment_hook('sudsakhon_dashbroad', 'ament_prefix_path')
+[0.156s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/sudsakhon_dashbroad/hook/ament_prefix_path.ps1'
+[0.157s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/sudsakhon_dashbroad/hook/ament_prefix_path.dsv'
+[0.157s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/sudsakhon_dashbroad/hook/ament_prefix_path.sh'
+[0.157s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.157s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.161s] INFO:colcon.colcon_ros.task.ament_python.build:Building ROS package in '/home/ubuntu/ros2_ws/src/sudsakhon_detectchair' with build type 'ament_python'
+[0.161s] Level 1:colcon.colcon_core.shell:create_environment_hook('sudsakhon_detectchair', 'ament_prefix_path')
+[0.161s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/share/sudsakhon_detectchair/hook/ament_prefix_path.ps1'
+[0.161s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/share/sudsakhon_detectchair/hook/ament_prefix_path.dsv'
+[0.161s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/share/sudsakhon_detectchair/hook/ament_prefix_path.sh'
+[0.162s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.162s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.166s] INFO:colcon.colcon_ros.task.ament_python.build:Building ROS package in '/home/ubuntu/ros2_ws/src/sudsakhon_mainprogram' with build type 'ament_python'
+[0.166s] Level 1:colcon.colcon_core.shell:create_environment_hook('sudsakhon_mainprogram', 'ament_prefix_path')
+[0.166s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/share/sudsakhon_mainprogram/hook/ament_prefix_path.ps1'
+[0.166s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/share/sudsakhon_mainprogram/hook/ament_prefix_path.dsv'
+[0.166s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/share/sudsakhon_mainprogram/hook/ament_prefix_path.sh'
+[0.166s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.166s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.170s] INFO:colcon.colcon_ros.task.ament_python.build:Building ROS package in '/home/ubuntu/ros2_ws/src/sudsakhon_odom' with build type 'ament_python'
+[0.170s] Level 1:colcon.colcon_core.shell:create_environment_hook('sudsakhon_odom', 'ament_prefix_path')
+[0.170s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_odom/share/sudsakhon_odom/hook/ament_prefix_path.ps1'
+[0.171s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_odom/share/sudsakhon_odom/hook/ament_prefix_path.dsv'
+[0.171s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_odom/share/sudsakhon_odom/hook/ament_prefix_path.sh'
+[0.171s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.171s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.175s] INFO:colcon.colcon_ros.task.ament_python.build:Building ROS package in '/home/ubuntu/ros2_ws/src/sudsakhon_transformation' with build type 'ament_python'
+[0.175s] Level 1:colcon.colcon_core.shell:create_environment_hook('sudsakhon_transformation', 'ament_prefix_path')
+[0.175s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_transformation/share/sudsakhon_transformation/hook/ament_prefix_path.ps1'
+[0.175s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_transformation/share/sudsakhon_transformation/hook/ament_prefix_path.dsv'
+[0.175s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_transformation/share/sudsakhon_transformation/hook/ament_prefix_path.sh'
+[0.176s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.176s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.182s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/ros2_ws/build/sllidar_ros2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ubuntu/ros2_ws/install/sudsakhon_transformation:/home/ubuntu/ros2_ws/install/sudsakhon_odom:/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram:/home/ubuntu/ros2_ws/install/sudsakhon_detectchair:/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad:/home/ubuntu/ros2_ws/install/sudsakhon_automation:/home/ubuntu/install/ament_uncrustify:/home/ubuntu/install/tracetools_read:/home/ubuntu/install/rpyutils:/home/ubuntu/install/rosidl_cli:/home/ubuntu/install/launch_pytest:/home/ubuntu/install/launch_testing:/home/ubuntu/install/launch_yaml:/home/ubuntu/install/launch_xml:/home/ubuntu/install/launch:/home/ubuntu/install/osrf_pycommon:/home/ubuntu/install/domain_coordinator:/home/ubuntu/install/ament_xmllint:/home/ubuntu/install/ament_pyflakes:/home/ubuntu/install/ament_pycodestyle:/home/ubuntu/install/ament_pep257:/home/ubuntu/install/ament_pclint:/home/ubuntu/install/ament_package:/home/ubuntu/install/ament_mypy:/home/ubuntu/install/ament_lint_cmake:/home/ubuntu/install/ament_flake8:/home/ubuntu/install/ament_copyright:/home/ubuntu/install/ament_lint:/home/ubuntu/install/ament_index_python:/home/ubuntu/install/ament_cpplint:/home/ubuntu/install/ament_cppcheck:/home/ubuntu/install/ament_clang_tidy:/home/ubuntu/install/ament_clang_format:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/ros2_ws/build/sllidar_ros2 -- -j12 -l12
+[0.333s] INFO:colcon.colcon_core.task.python.build:Building Python package in '/home/ubuntu/ros2_ws/src/sudsakhon_automation'
+[0.334s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.334s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.461s] INFO:colcon.colcon_core.task.python.build:Building Python package in '/home/ubuntu/ros2_ws/src/sudsakhon_dashbroad'
+[0.462s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.462s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.591s] INFO:colcon.colcon_core.task.python.build:Building Python package in '/home/ubuntu/ros2_ws/src/sudsakhon_detectchair'
+[0.591s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.591s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.720s] INFO:colcon.colcon_core.task.python.build:Building Python package in '/home/ubuntu/ros2_ws/src/sudsakhon_mainprogram'
+[0.720s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.720s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.851s] INFO:colcon.colcon_core.task.python.build:Building Python package in '/home/ubuntu/ros2_ws/src/sudsakhon_odom'
+[0.852s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.852s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.858s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/ubuntu/ros2_ws/build/sllidar_ros2' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ubuntu/ros2_ws/install/sudsakhon_transformation:/home/ubuntu/ros2_ws/install/sudsakhon_odom:/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram:/home/ubuntu/ros2_ws/install/sudsakhon_detectchair:/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad:/home/ubuntu/ros2_ws/install/sudsakhon_automation:/home/ubuntu/install/ament_uncrustify:/home/ubuntu/install/tracetools_read:/home/ubuntu/install/rpyutils:/home/ubuntu/install/rosidl_cli:/home/ubuntu/install/launch_pytest:/home/ubuntu/install/launch_testing:/home/ubuntu/install/launch_yaml:/home/ubuntu/install/launch_xml:/home/ubuntu/install/launch:/home/ubuntu/install/osrf_pycommon:/home/ubuntu/install/domain_coordinator:/home/ubuntu/install/ament_xmllint:/home/ubuntu/install/ament_pyflakes:/home/ubuntu/install/ament_pycodestyle:/home/ubuntu/install/ament_pep257:/home/ubuntu/install/ament_pclint:/home/ubuntu/install/ament_package:/home/ubuntu/install/ament_mypy:/home/ubuntu/install/ament_lint_cmake:/home/ubuntu/install/ament_flake8:/home/ubuntu/install/ament_copyright:/home/ubuntu/install/ament_lint:/home/ubuntu/install/ament_index_python:/home/ubuntu/install/ament_cpplint:/home/ubuntu/install/ament_cppcheck:/home/ubuntu/install/ament_clang_tidy:/home/ubuntu/install/ament_clang_format:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/ros2_ws/build/sllidar_ros2 -- -j12 -l12
+[0.864s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/ros2_ws/build/sllidar_ros2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ubuntu/ros2_ws/install/sudsakhon_transformation:/home/ubuntu/ros2_ws/install/sudsakhon_odom:/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram:/home/ubuntu/ros2_ws/install/sudsakhon_detectchair:/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad:/home/ubuntu/ros2_ws/install/sudsakhon_automation:/home/ubuntu/install/ament_uncrustify:/home/ubuntu/install/tracetools_read:/home/ubuntu/install/rpyutils:/home/ubuntu/install/rosidl_cli:/home/ubuntu/install/launch_pytest:/home/ubuntu/install/launch_testing:/home/ubuntu/install/launch_yaml:/home/ubuntu/install/launch_xml:/home/ubuntu/install/launch:/home/ubuntu/install/osrf_pycommon:/home/ubuntu/install/domain_coordinator:/home/ubuntu/install/ament_xmllint:/home/ubuntu/install/ament_pyflakes:/home/ubuntu/install/ament_pycodestyle:/home/ubuntu/install/ament_pep257:/home/ubuntu/install/ament_pclint:/home/ubuntu/install/ament_package:/home/ubuntu/install/ament_mypy:/home/ubuntu/install/ament_lint_cmake:/home/ubuntu/install/ament_flake8:/home/ubuntu/install/ament_copyright:/home/ubuntu/install/ament_lint:/home/ubuntu/install/ament_index_python:/home/ubuntu/install/ament_cpplint:/home/ubuntu/install/ament_cppcheck:/home/ubuntu/install/ament_clang_tidy:/home/ubuntu/install/ament_clang_format:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/ros2_ws/build/sllidar_ros2
+[0.990s] INFO:colcon.colcon_core.task.python.build:Building Python package in '/home/ubuntu/ros2_ws/src/sudsakhon_transformation'
+[0.991s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.991s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[1.004s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(sllidar_ros2)
+[1.007s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/ubuntu/ros2_ws/build/sllidar_ros2' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ubuntu/ros2_ws/install/sudsakhon_transformation:/home/ubuntu/ros2_ws/install/sudsakhon_odom:/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram:/home/ubuntu/ros2_ws/install/sudsakhon_detectchair:/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad:/home/ubuntu/ros2_ws/install/sudsakhon_automation:/home/ubuntu/install/ament_uncrustify:/home/ubuntu/install/tracetools_read:/home/ubuntu/install/rpyutils:/home/ubuntu/install/rosidl_cli:/home/ubuntu/install/launch_pytest:/home/ubuntu/install/launch_testing:/home/ubuntu/install/launch_yaml:/home/ubuntu/install/launch_xml:/home/ubuntu/install/launch:/home/ubuntu/install/osrf_pycommon:/home/ubuntu/install/domain_coordinator:/home/ubuntu/install/ament_xmllint:/home/ubuntu/install/ament_pyflakes:/home/ubuntu/install/ament_pycodestyle:/home/ubuntu/install/ament_pep257:/home/ubuntu/install/ament_pclint:/home/ubuntu/install/ament_package:/home/ubuntu/install/ament_mypy:/home/ubuntu/install/ament_lint_cmake:/home/ubuntu/install/ament_flake8:/home/ubuntu/install/ament_copyright:/home/ubuntu/install/ament_lint:/home/ubuntu/install/ament_index_python:/home/ubuntu/install/ament_cpplint:/home/ubuntu/install/ament_cppcheck:/home/ubuntu/install/ament_clang_tidy:/home/ubuntu/install/ament_clang_format:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/ros2_ws/build/sllidar_ros2
+[1.008s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sllidar_ros2' for CMake module files
+[1.009s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sllidar_ros2' for CMake config files
+[1.009s] Level 1:colcon.colcon_core.shell:create_environment_hook('sllidar_ros2', 'cmake_prefix_path')
+[1.009s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sllidar_ros2/share/sllidar_ros2/hook/cmake_prefix_path.ps1'
+[1.010s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/ros2_ws/install/sllidar_ros2/share/sllidar_ros2/hook/cmake_prefix_path.dsv'
+[1.010s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sllidar_ros2/share/sllidar_ros2/hook/cmake_prefix_path.sh'
+[1.011s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sllidar_ros2/lib'
+[1.011s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sllidar_ros2/bin'
+[1.011s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sllidar_ros2/lib/pkgconfig/sllidar_ros2.pc'
+[1.011s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sllidar_ros2/lib/python3.12/site-packages'
+[1.012s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sllidar_ros2/bin'
+[1.012s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sllidar_ros2/share/sllidar_ros2/package.ps1'
+[1.013s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/ubuntu/ros2_ws/install/sllidar_ros2/share/sllidar_ros2/package.dsv'
+[1.013s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sllidar_ros2/share/sllidar_ros2/package.sh'
+[1.014s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sllidar_ros2/share/sllidar_ros2/package.bash'
+[1.015s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sllidar_ros2/share/sllidar_ros2/package.zsh'
+[1.015s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/ubuntu/ros2_ws/install/sllidar_ros2/share/colcon-core/packages/sllidar_ros2)
+[1.016s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(sllidar_ros2)
+[1.016s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sllidar_ros2' for CMake module files
+[1.017s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sllidar_ros2' for CMake config files
+[1.017s] Level 1:colcon.colcon_core.shell:create_environment_hook('sllidar_ros2', 'cmake_prefix_path')
+[1.017s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sllidar_ros2/share/sllidar_ros2/hook/cmake_prefix_path.ps1'
+[1.018s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/ros2_ws/install/sllidar_ros2/share/sllidar_ros2/hook/cmake_prefix_path.dsv'
+[1.018s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sllidar_ros2/share/sllidar_ros2/hook/cmake_prefix_path.sh'
+[1.018s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sllidar_ros2/lib'
+[1.018s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sllidar_ros2/bin'
+[1.018s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sllidar_ros2/lib/pkgconfig/sllidar_ros2.pc'
+[1.019s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sllidar_ros2/lib/python3.12/site-packages'
+[1.019s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sllidar_ros2/bin'
+[1.019s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sllidar_ros2/share/sllidar_ros2/package.ps1'
+[1.019s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/ubuntu/ros2_ws/install/sllidar_ros2/share/sllidar_ros2/package.dsv'
+[1.019s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sllidar_ros2/share/sllidar_ros2/package.sh'
+[1.020s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sllidar_ros2/share/sllidar_ros2/package.bash'
+[1.020s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sllidar_ros2/share/sllidar_ros2/package.zsh'
+[1.020s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/ubuntu/ros2_ws/install/sllidar_ros2/share/colcon-core/packages/sllidar_ros2)
+[1.393s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/ros2_ws/src/sudsakhon_odom': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_odom/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_odom/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_odom build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_odom/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_odom/install.log --single-version-externally-managed install_data
+[1.480s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/ros2_ws/src/sudsakhon_mainprogram': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_mainprogram/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_mainprogram build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_mainprogram/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_mainprogram/install.log --single-version-externally-managed install_data
+[1.746s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/ros2_ws/src/sudsakhon_transformation': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_transformation/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_transformation/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_transformation build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_transformation/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_transformation/install.log --single-version-externally-managed install_data
+[1.806s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_odom' for CMake module files
+[1.807s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/ubuntu/ros2_ws/src/sudsakhon_odom' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_odom/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_odom/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_odom build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_odom/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_odom/install.log --single-version-externally-managed install_data
+[1.807s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_odom' for CMake config files
+[1.808s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_odom/lib'
+[1.808s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_odom/bin'
+[1.808s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_odom/lib/pkgconfig/sudsakhon_odom.pc'
+[1.809s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_odom/lib/python3.12/site-packages'
+[1.809s] Level 1:colcon.colcon_core.shell:create_environment_hook('sudsakhon_odom', 'pythonpath')
+[1.809s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_odom/share/sudsakhon_odom/hook/pythonpath.ps1'
+[1.810s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_odom/share/sudsakhon_odom/hook/pythonpath.dsv'
+[1.810s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_odom/share/sudsakhon_odom/hook/pythonpath.sh'
+[1.811s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_odom/bin'
+[1.811s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(sudsakhon_odom)
+[1.811s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_odom/share/sudsakhon_odom/package.ps1'
+[1.812s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_odom/share/sudsakhon_odom/package.dsv'
+[1.812s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_odom/share/sudsakhon_odom/package.sh'
+[1.813s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_odom/share/sudsakhon_odom/package.bash'
+[1.813s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_odom/share/sudsakhon_odom/package.zsh'
+[1.814s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/ubuntu/ros2_ws/install/sudsakhon_odom/share/colcon-core/packages/sudsakhon_odom)
+[1.825s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/ros2_ws/src/sudsakhon_automation': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_automation/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_automation/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_automation build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_automation/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_automation/install.log --single-version-externally-managed install_data
+[1.845s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/ros2_ws/src/sudsakhon_dashbroad': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_dashbroad build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/install.log --single-version-externally-managed install_data
+[1.847s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/ros2_ws/src/sudsakhon_detectchair': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_detectchair/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_detectchair build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/install.log --single-version-externally-managed install_data
+[1.884s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram' for CMake module files
+[1.884s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/ubuntu/ros2_ws/src/sudsakhon_mainprogram' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_mainprogram/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_mainprogram build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_mainprogram/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_mainprogram/install.log --single-version-externally-managed install_data
+[1.885s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram' for CMake config files
+[1.885s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/lib'
+[1.885s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/bin'
+[1.886s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/lib/pkgconfig/sudsakhon_mainprogram.pc'
+[1.886s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/lib/python3.12/site-packages'
+[1.886s] Level 1:colcon.colcon_core.shell:create_environment_hook('sudsakhon_mainprogram', 'pythonpath')
+[1.886s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/share/sudsakhon_mainprogram/hook/pythonpath.ps1'
+[1.887s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/share/sudsakhon_mainprogram/hook/pythonpath.dsv'
+[1.887s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/share/sudsakhon_mainprogram/hook/pythonpath.sh'
+[1.888s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/bin'
+[1.888s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(sudsakhon_mainprogram)
+[1.888s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/share/sudsakhon_mainprogram/package.ps1'
+[1.889s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/share/sudsakhon_mainprogram/package.dsv'
+[1.889s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/share/sudsakhon_mainprogram/package.sh'
+[1.890s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/share/sudsakhon_mainprogram/package.bash'
+[1.890s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/share/sudsakhon_mainprogram/package.zsh'
+[1.890s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/share/colcon-core/packages/sudsakhon_mainprogram)
+[2.183s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_transformation' for CMake module files
+[2.184s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/ubuntu/ros2_ws/src/sudsakhon_transformation' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_transformation/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_transformation/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_transformation build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_transformation/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_transformation/install.log --single-version-externally-managed install_data
+[2.184s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_transformation' for CMake config files
+[2.184s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_transformation/lib'
+[2.184s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_transformation/bin'
+[2.184s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_transformation/lib/pkgconfig/sudsakhon_transformation.pc'
+[2.185s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_transformation/lib/python3.12/site-packages'
+[2.185s] Level 1:colcon.colcon_core.shell:create_environment_hook('sudsakhon_transformation', 'pythonpath')
+[2.185s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_transformation/share/sudsakhon_transformation/hook/pythonpath.ps1'
+[2.185s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_transformation/share/sudsakhon_transformation/hook/pythonpath.dsv'
+[2.185s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_transformation/share/sudsakhon_transformation/hook/pythonpath.sh'
+[2.186s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_transformation/bin'
+[2.186s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(sudsakhon_transformation)
+[2.186s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_transformation/share/sudsakhon_transformation/package.ps1'
+[2.186s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_transformation/share/sudsakhon_transformation/package.dsv'
+[2.186s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_transformation/share/sudsakhon_transformation/package.sh'
+[2.186s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_transformation/share/sudsakhon_transformation/package.bash'
+[2.187s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_transformation/share/sudsakhon_transformation/package.zsh'
+[2.187s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/ubuntu/ros2_ws/install/sudsakhon_transformation/share/colcon-core/packages/sudsakhon_transformation)
+[2.225s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_automation' for CMake module files
+[2.225s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/ubuntu/ros2_ws/src/sudsakhon_automation' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_automation/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_automation/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_automation build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_automation/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_automation/install.log --single-version-externally-managed install_data
+[2.226s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_automation' for CMake config files
+[2.226s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_automation/lib'
+[2.226s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_automation/bin'
+[2.226s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_automation/lib/pkgconfig/sudsakhon_automation.pc'
+[2.227s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_automation/lib/python3.12/site-packages'
+[2.227s] Level 1:colcon.colcon_core.shell:create_environment_hook('sudsakhon_automation', 'pythonpath')
+[2.227s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_automation/share/sudsakhon_automation/hook/pythonpath.ps1'
+[2.227s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_automation/share/sudsakhon_automation/hook/pythonpath.dsv'
+[2.228s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_automation/share/sudsakhon_automation/hook/pythonpath.sh'
+[2.228s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_automation/bin'
+[2.228s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(sudsakhon_automation)
+[2.229s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_automation/share/sudsakhon_automation/package.ps1'
+[2.229s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_automation/share/sudsakhon_automation/package.dsv'
+[2.230s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_automation/share/sudsakhon_automation/package.sh'
+[2.230s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_automation/share/sudsakhon_automation/package.bash'
+[2.230s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_automation/share/sudsakhon_automation/package.zsh'
+[2.231s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/ubuntu/ros2_ws/install/sudsakhon_automation/share/colcon-core/packages/sudsakhon_automation)
+[2.333s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair' for CMake module files
+[2.334s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/ubuntu/ros2_ws/src/sudsakhon_detectchair' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_detectchair/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_detectchair build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/install.log --single-version-externally-managed install_data
+[2.334s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair' for CMake config files
+[2.335s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib'
+[2.335s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/bin'
+[2.335s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/pkgconfig/sudsakhon_detectchair.pc'
+[2.335s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/python3.12/site-packages'
+[2.336s] Level 1:colcon.colcon_core.shell:create_environment_hook('sudsakhon_detectchair', 'pythonpath')
+[2.336s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/share/sudsakhon_detectchair/hook/pythonpath.ps1'
+[2.336s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/share/sudsakhon_detectchair/hook/pythonpath.dsv'
+[2.336s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/share/sudsakhon_detectchair/hook/pythonpath.sh'
+[2.337s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/bin'
+[2.337s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(sudsakhon_detectchair)
+[2.338s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/share/sudsakhon_detectchair/package.ps1'
+[2.338s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/share/sudsakhon_detectchair/package.dsv'
+[2.338s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/share/sudsakhon_detectchair/package.sh'
+[2.339s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/share/sudsakhon_detectchair/package.bash'
+[2.339s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/share/sudsakhon_detectchair/package.zsh'
+[2.339s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/share/colcon-core/packages/sudsakhon_detectchair)
+[2.422s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad' for CMake module files
+[2.423s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/ubuntu/ros2_ws/src/sudsakhon_dashbroad' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_dashbroad build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_dashbroad/install.log --single-version-externally-managed install_data
+[2.423s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad' for CMake config files
+[2.423s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib'
+[2.423s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/bin'
+[2.423s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/pkgconfig/sudsakhon_dashbroad.pc'
+[2.424s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages'
+[2.424s] Level 1:colcon.colcon_core.shell:create_environment_hook('sudsakhon_dashbroad', 'pythonpath')
+[2.424s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/sudsakhon_dashbroad/hook/pythonpath.ps1'
+[2.424s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/sudsakhon_dashbroad/hook/pythonpath.dsv'
+[2.424s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/sudsakhon_dashbroad/hook/pythonpath.sh'
+[2.425s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/bin'
+[2.425s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(sudsakhon_dashbroad)
+[2.425s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/sudsakhon_dashbroad/package.ps1'
+[2.425s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/sudsakhon_dashbroad/package.dsv'
+[2.425s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/sudsakhon_dashbroad/package.sh'
+[2.425s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/sudsakhon_dashbroad/package.bash'
+[2.426s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/sudsakhon_dashbroad/package.zsh'
+[2.426s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/share/colcon-core/packages/sudsakhon_dashbroad)
+[2.426s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:closing loop
+[2.426s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:loop closed
+[2.426s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete finished with '0'
+[2.426s] DEBUG:colcon.colcon_core.event_reactor:joining thread
+[2.430s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.terminal_notifier': Not used on non-Darwin systems
+[2.430s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.win32': Not used on non-Windows systems
+[2.430s] INFO:colcon.colcon_notification.desktop_notification:Sending desktop notification using 'notify2'
+[2.435s] DEBUG:colcon.colcon_core.event_reactor:joined thread
+[2.436s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/ubuntu/ros2_ws/install/local_setup.ps1'
+[2.436s] INFO:colcon.colcon_core.shell:Creating prefix util module '/home/ubuntu/ros2_ws/install/_local_setup_util_ps1.py'
+[2.436s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/ubuntu/ros2_ws/install/setup.ps1'
+[2.438s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/ubuntu/ros2_ws/install/local_setup.sh'
+[2.438s] INFO:colcon.colcon_core.shell:Creating prefix util module '/home/ubuntu/ros2_ws/install/_local_setup_util_sh.py'
+[2.439s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/ubuntu/ros2_ws/install/setup.sh'
+[2.440s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/ubuntu/ros2_ws/install/local_setup.bash'
+[2.440s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/ubuntu/ros2_ws/install/setup.bash'
+[2.442s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/ubuntu/ros2_ws/install/local_setup.zsh'
+[2.442s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/ubuntu/ros2_ws/install/setup.zsh'

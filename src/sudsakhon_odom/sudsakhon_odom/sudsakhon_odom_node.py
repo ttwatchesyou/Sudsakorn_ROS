@@ -1,169 +1,280 @@
+#!/usr/bin/env python3
+"""
+Robot Bridge Node — ROS2 ↔ STM32 Serial  (merged v3)
+
+Serial format รับจาก STM32:
+  POS:curX:curY:curYaw:tick_x:tick_y
+
+Commands ส่งไป STM32:
+  G<x>:<y>:<yaw>        → goal position
+  V<vx>:<vy>            → manual velocity
+  Z                     → reset odometry
+  S<speed>              → set max speed
+  P5:<rpm>:<rad>:<kp>   → yaw profile
+  P6:<kp>:<ki>:<kd>     → position PID
+  T<accel>:<decel>:<mv> → trapezoidal profile
+"""
+
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist, TransformStamped, PoseWithCovarianceStamped
-from nav_msgs.msg import Odometry
+import tf2_ros
 import serial
-import time
 import threading
+import time
 import math
+
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import (Quaternion, TransformStamped,
+                                Pose2D, Twist,
+                                PoseWithCovarianceStamped)
+from std_msgs.msg import Float32, Empty, Float32MultiArray
 from tf2_ros import TransformBroadcaster
+
 
 class SudsakhonOdomNode(Node):
     def __init__(self):
         super().__init__('sudsakhon_odom_node')
-        
-        # --- การตั้งค่า Serial ---
-        port_name = '/dev/Controller_Base' 
-        baud_rate = 115200
-        
-        # --- พารามิเตอร์ของ Dead Wheels (ปรับให้ตรงกับอุปกรณ์จริง) ---
-        self.dead_wheel_radius = 0.027  # รัศมีล้ออิสระ (เช่น 24mm)
-        self.ticks_per_rev = 600.0      # จำนวน Tick ต่อรอบของ Encoder X/Y
-        self.meters_per_tick = (2.0 * math.pi * self.dead_wheel_radius) / self.ticks_per_rev
 
+        # ── Parameters ───────────────────────────────────────────────────────
+        self.declare_parameter('serial_port', '/dev/Controller_Base')
+        self.declare_parameter('baud_rate',   115200)
+        self.declare_parameter('max_speed',   0.6)
+
+        # ── Serial ───────────────────────────────────────────────────────────
+        port      = self.get_parameter('serial_port').value
+        baud_rate = self.get_parameter('baud_rate').value
+        self.ser  = None
         try:
-            self.serial_port = serial.Serial(port_name, baud_rate, timeout=0.1)
-            time.sleep(2) 
-            self.get_logger().info(f"✅ Connected to STM32 (Dead Wheels Mode) on {port_name}")
+            self.ser = serial.Serial(port, baud_rate, timeout=0.1)
+            time.sleep(1)
+            self.get_logger().info(f"✅ Serial connected: {port}")
+            self.send_to_robot('S', f"{self.get_parameter('max_speed').value}")
         except Exception as e:
-            self.get_logger().error(f"❌ Serial Error: {e}")
-            raise SystemExit
+            self.get_logger().error(f"❌ Serial error: {e}")
 
-        # Subscribers
-        self.create_subscription(Twist, '/cmd_vel', self.cmd_vel_cb, 10)
-        self.create_subscription(PoseWithCovarianceStamped, '/initialpose', self.init_pose_cb, 10)
-        
-        # Publishers
-        self.odom_pub = self.create_publisher(Odometry, '/odom', 10)
-        self.tf_br = TransformBroadcaster(self)
+        # ── Publishers & TF ──────────────────────────────────────────────────
+        self.odom_pub    = self.create_publisher(Odometry, '/odom', 10)
+        self.tf_br       = TransformBroadcaster(self)
 
-        # --- State Variables ---
-        self.x = 0.0; self.y = 0.0; self.th = 0.0
-        self.prev_tick_x = 0
-        self.prev_tick_y = 0
-        self.prev_yaw = 0.0
-        self.yaw_offset = 0.0 
-        
-        self.first_read = True 
-        self.last_time = self.get_clock().now()
-        
-        # Thread สำหรับอ่านค่าจาก Serial
+        # ── Subscriptions ─────────────────────────────────────────────────────
+        # --- motion commands ---
+        self.create_subscription(Twist,  '/cmd_vel',  self.vel_callback,  10)
+        self.create_subscription(Pose2D, '/cmd_goal', self.goal_callback, 10)
+
+        # --- tuner topics ---
+        self.create_subscription(Empty,             '/cmd_reset_odom',   self.reset_callback,   10)
+        self.create_subscription(Float32MultiArray, '/cmd_pos_pid',      self.pos_pid_callback, 10)
+        self.create_subscription(Float32MultiArray, '/cmd_yaw_pid',      self.yaw_pid_callback, 10)
+        self.create_subscription(Float32,           '/cmd_max_speed',    self.speed_callback,   10)
+        self.create_subscription(Float32MultiArray, '/cmd_trap_profile', self.trap_callback,    10)
+
+        # --- nav2 init pose (2D Pose Estimate จาก RViz) ---
+        self.create_subscription(PoseWithCovarianceStamped,
+                                 '/initialpose', self.init_pose_cb, 10)
+
+        # ── Odometry state ────────────────────────────────────────────────────
+        self.x   = 0.0
+        self.y   = 0.0
+        self.yaw = 0.0
+
+        # ── Serial read thread ────────────────────────────────────────────────
         self.running = True
-        self.read_thread = threading.Thread(target=self.serial_loop, daemon=True)
-        self.read_thread.start()
+        threading.Thread(target=self.serial_loop, daemon=True).start()
+
+        # ── Parameter live-update ─────────────────────────────────────────────
+        self.add_on_set_parameters_callback(self.parameter_callback)
+
+        self.get_logger().info("SudsakhonOdomNode ready ✅")
+
+    # ── Parameter callback ────────────────────────────────────────────────────
+    def parameter_callback(self, params):
+        for p in params:
+            if p.name == 'max_speed':
+                self.send_to_robot('S', f"{p.value}")
+        return rclpy.node.SetParametersResult(successful=True)
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # TOPIC CALLBACKS
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def vel_callback(self, msg):
+        """
+        /cmd_vel → V<vx>:<vy>
+        ใช้ linear.x / linear.y เป็น velocity ใน robot frame
+        angular.z ถูกละเว้น — STM32 ใช้ yaw lock ของตัวเอง
+        """
+        vx = round(msg.linear.x, 3)
+        vy = round(msg.linear.y, 3)
+        self.send_to_robot('V', f"{vx}:{vy}")
+
+    def goal_callback(self, msg):
+        """
+        /cmd_goal (Pose2D) → G<x>:<y>:<theta>
+        """
+        self.send_to_robot('G', f"{msg.x}:{msg.y}:{msg.theta}")
+
+    def reset_callback(self, _):
+        """
+        /cmd_reset_odom → Z
+        รีเซ็ต odom ทั้ง STM32 และ state ใน Python
+        """
+        self.x = self.y = 0.0
+        self.send_to_robot('Z', "")
+        self.get_logger().info("Odometry reset")
 
     def init_pose_cb(self, msg):
-        """ ฟังก์ชันรีเซ็ตตำแหน่งจาก GUI (2D Pose Estimate) """
+        """
+        /initialpose (2D Pose Estimate จาก RViz / Nav2)
+        ตั้งค่าตำแหน่งเริ่มต้นโดยไม่ reset STM32
+        """
         self.x = msg.pose.pose.position.x
         self.y = msg.pose.pose.position.y
         q = msg.pose.pose.orientation
-        target_yaw = math.atan2(2.0*(q.w*q.z + q.x*q.y), 1.0-2.0*(q.y*q.y + q.z*q.z))
-        self.yaw_offset = target_yaw - self.prev_yaw
-        self.get_logger().info(f"📍 Odom Reset! X:{self.x:.2f} Y:{self.y:.2f} Yaw:{target_yaw:.2f}")
+        self.yaw = math.atan2(
+            2.0 * (q.w * q.z + q.x * q.y),
+            1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+        )
+        self.get_logger().info(
+            f"📍 Init pose → X:{self.x:.3f}  Y:{self.y:.3f}  θ:{math.degrees(self.yaw):.1f}°")
 
-    def cmd_vel_cb(self, msg):
-        """ ส่งคำสั่งความเร็วไปยัง STM32 """
-        cmd = f"C{msg.linear.x:.3f}:{msg.linear.y:.3f}:{msg.angular.z:.3f}\n"
-        if self.serial_port.is_open:
-            self.serial_port.write(cmd.encode('utf-8'))
+    def pos_pid_callback(self, msg):
+        """
+        /cmd_pos_pid [kp, ki, kd] → P6:<kp>:<ki>:<kd>
+        """
+        if len(msg.data) >= 3:
+            kp, ki, kd = msg.data[0], msg.data[1], msg.data[2]
+            self.send_to_robot('P', f"6:{kp}:{ki}:{kd}")
 
+    def yaw_pid_callback(self, msg):
+        """
+        /cmd_yaw_pid [max_rpm, brake_rad, fine_kp] → P5:<max_rpm>:<brake_rad>:<fine_kp>
+        """
+        if len(msg.data) >= 3:
+            rpm, brake, fkp = msg.data[0], msg.data[1], msg.data[2]
+            self.send_to_robot('P', f"5:{rpm}:{brake}:{fkp}")
+
+    def speed_callback(self, msg):
+        """
+        /cmd_max_speed (Float32) → S<speed>
+        """
+        spd = round(float(msg.data), 3)
+        self.send_to_robot('S', f"{spd}")
+
+    def trap_callback(self, msg):
+        """
+        /cmd_trap_profile [accel, decel, min_v] → T<accel>:<decel>:<min_v>
+        """
+        if len(msg.data) >= 3:
+            accel, decel, min_v = msg.data[0], msg.data[1], msg.data[2]
+            self.send_to_robot('T', f"{accel}:{decel}:{min_v}")
+            self.get_logger().info(
+                f"Trap profile → accel:{accel:.1f}  decel:{decel:.1f}  min_v:{min_v:.2f}")
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # SERIAL SEND
+    # ══════════════════════════════════════════════════════════════════════════
+    def send_to_robot(self, cmd_type, data):
+        if self.ser and self.ser.is_open:
+            full_cmd = f"{cmd_type}{data}\n"
+            try:
+                self.ser.write(full_cmd.encode())
+                if cmd_type != 'V':   # ไม่ log velocity spam
+                    self.get_logger().info(f"TX: {full_cmd.strip()}")
+            except Exception as e:
+                self.get_logger().error(f"Serial write error: {e}")
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # SERIAL READ LOOP
+    # STM32 ส่ง: POS:curX:curY:curYaw:tick_x:tick_y
+    # ══════════════════════════════════════════════════════════════════════════
     def serial_loop(self):
-        while self.running:
-            if self.serial_port.in_waiting:
+        while self.running and rclpy.ok():
+            if self.ser and self.ser.in_waiting > 0:
                 try:
-                    line = self.serial_port.readline().decode('utf-8', errors='ignore').strip()
-                    if line.startswith("FB:"):
-                        p = line.split(':')
-                        # p[14] คือ tick_x, p[15] คือ tick_y (อ้างอิงจากโค้ด main.cpp ล่าสุด)
-                        if len(p) >= 16:
-                            raw_yaw = float(p[5])
-                            curr_tick_x = int(p[14])
-                            curr_tick_y = int(p[15])
-                            self.process_dead_wheels(curr_tick_x, curr_tick_y, raw_yaw)
-                except: pass
+                    line = self.ser.readline().decode('utf-8', errors='ignore').strip()
+
+                    if line.startswith("POS:"):
+                        parts = line.split(':')
+                        if len(parts) >= 4:
+                            x   = float(parts[1])   # curX   (m) — คำนวณแล้วจาก STM32
+                            y   = float(parts[2])   # curY   (m)
+                            yaw = float(parts[3])   # curYaw (rad)
+                            # tick_x = int(parts[4])  # สำรองไว้ถ้าต้องการ
+                            # tick_y = int(parts[5])
+                            self._update_pose(x, y, yaw)
+
+                except Exception as e:
+                    self.get_logger().debug(f"Serial parse error: {e}")
             time.sleep(0.005)
 
-    def process_dead_wheels(self, tick_x, tick_y, raw_yaw):
-        now = self.get_clock().now()
-        if self.first_read:
-            self.prev_tick_x = tick_x
-            self.prev_tick_y = tick_y
-            self.prev_yaw = raw_yaw
-            self.last_time = now
-            self.first_read = False
-            return
+    def _update_pose(self, x, y, yaw):
+        """อัปเดต pose จาก STM32 แล้ว publish odom + TF"""
+        # ถ้า init_pose_cb ตั้งค่าไว้ จะ override ค่าจาก STM32
+        # ใช้ค่าจาก STM32 ตรงๆ (STM32 คำนวณ odom เองแล้ว)
+        self.x   = x
+        self.y   = y
+        self.yaw = yaw
+        self.publish_odom(x, y, yaw)
 
-        dt = (now - self.last_time).nanoseconds / 1e9
-        if dt <= 0: return
+    # ══════════════════════════════════════════════════════════════════════════
+    # PUBLISH ODOM + TF
+    # ══════════════════════════════════════════════════════════════════════════
+    def publish_odom(self, x, y, yaw):
+        now = self.get_clock().now().to_msg()
+        q   = self._euler_to_quat(yaw)
 
-        # 1. คำนวณระยะทางที่เคลื่อนที่ได้ในแนวพิกัดหุ่นยนต์ (Local Frame)
-        # ใช้ Ticks จากล้ออิสระโดยตรง ไม่ผ่านค่าเฉลี่ยของล้อขับ
-        dx_local = (tick_x - self.prev_tick_x) * self.meters_per_tick
-        dy_local = (tick_y - self.prev_tick_y) * self.meters_per_tick
-        
-        # 2. คำนวณมุม (Yaw)
-        dyaw = raw_yaw - self.prev_yaw
-        while dyaw > math.pi: dyaw -= 2*math.pi
-        while dyaw < -math.pi: dyaw += 2*math.pi
-        
-        # ทิศทางหุ่นในพิกัดโลก
-        self.th = raw_yaw + self.yaw_offset
-        while self.th > math.pi: self.th -= 2*math.pi
-        while self.th < -math.pi: self.th += 2*math.pi
-
-        # 3. แปลงระยะทาง Local เป็นพิกัด Global (X, Y ของแผนที่โลก)
-        # displacement = R(theta) * local_displacement
-        delta_x_world = (dx_local * math.cos(self.th)) - (dy_local * math.sin(self.th))
-        delta_y_world = (dx_local * math.sin(self.th)) + (dy_local * math.cos(self.th))
-
-        self.x += delta_x_world
-        self.y += delta_y_world
-
-        # เก็บค่าปัจจุบันไว้ใช้ในรอบหน้า
-        self.prev_tick_x = tick_x
-        self.prev_tick_y = tick_y
-        self.prev_yaw = raw_yaw
-        self.last_time = now
-
-        # --- ส่วนของการส่งข้อมูลออก (Publish & TF) ---
-        q_z = math.sin(self.th / 2.0)
-        q_w = math.cos(self.th / 2.0)
-
-        # Broadcast TF: odom -> base_link
+        # TF: odom → base_link
         t = TransformStamped()
-        t.header.stamp = now.to_msg()
-        t.header.frame_id = 'odom'
-        t.child_frame_id = 'base_link'
-        t.transform.translation.x = self.x
-        t.transform.translation.y = self.y
-        t.transform.rotation.z = q_z
-        t.transform.rotation.w = q_w
+        t.header.stamp        = now
+        t.header.frame_id     = 'odom'
+        t.child_frame_id      = 'base_link'
+        t.transform.translation.x = x
+        t.transform.translation.y = y
+        t.transform.translation.z = 0.0
+        t.transform.rotation      = q
         self.tf_br.sendTransform(t)
 
-        # Publish Odometry Message
-        msg = Odometry()
-        msg.header = t.header
-        msg.child_frame_id = 'base_link'
-        msg.pose.pose.position.x = self.x
-        msg.pose.pose.position.y = self.y
-        msg.pose.pose.orientation = t.transform.rotation
-        
-        # ความเร็วปัจจุบัน (m/s)
-        msg.twist.twist.linear.x = dx_local / dt
-        msg.twist.twist.linear.y = dy_local / dt
-        msg.twist.twist.angular.z = dyaw / dt
-        
-        self.odom_pub.publish(msg)
+        # Odometry message
+        odom = Odometry()
+        odom.header.stamp        = now
+        odom.header.frame_id     = 'odom'
+        odom.child_frame_id      = 'base_link'
+        odom.pose.pose.position.x  = x
+        odom.pose.pose.position.y  = y
+        odom.pose.pose.position.z  = 0.0
+        odom.pose.pose.orientation = q
+        self.odom_pub.publish(odom)
 
+    # ══════════════════════════════════════════════════════════════════════════
+    # HELPERS
+    # ══════════════════════════════════════════════════════════════════════════
+    def _euler_to_quat(self, yaw):
+        q = Quaternion()
+        q.w = math.cos(yaw * 0.5)
+        q.x = 0.0
+        q.y = 0.0
+        q.z = math.sin(yaw * 0.5)
+        return q
+
+    def destroy_node(self):
+        self.running = False
+        if self.ser and self.ser.is_open:
+            self.ser.close()
+        super().destroy_node()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 def main(args=None):
     rclpy.init(args=args)
-    n = SudsakhonOdomNode()
-    try: rclpy.spin(n)
-    except KeyboardInterrupt: pass
+    node = SudsakhonOdomNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
     finally:
-        n.running = False
-        if n.serial_port.is_open: n.serial_port.close()
-        n.destroy_node(); rclpy.shutdown()
+        node.destroy_node()
+        rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

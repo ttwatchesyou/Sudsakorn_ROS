@@ -1,0 +1,2 @@
+[console_scripts]
+yolo_depth_pub = sudsakhon_objectdetechtion.yolo_depth_pub:main
