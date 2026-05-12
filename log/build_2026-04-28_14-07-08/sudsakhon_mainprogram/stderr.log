@@ -1,5 +1,0 @@
-  File "/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/lib/python3.12/site-packages/sudsakhon_mainprogram/main_controller.py", line 94
-    def send_parameters((self, min_w, max_w, threshold, gap, min_deg, max_deg)):
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-SyntaxError: Function parameters cannot be parenthesized
-

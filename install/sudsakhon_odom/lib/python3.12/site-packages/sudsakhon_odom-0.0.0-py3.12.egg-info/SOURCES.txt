@@ -10,7 +10,6 @@ setup.py
 ../../build/sudsakhon_odom/sudsakhon_odom.egg-info/zip-safe
 resource/sudsakhon_odom
 sudsakhon_odom/__init__.py
-sudsakhon_odom/sudsakhon_odom_node.py
 sudsakhon_odom/sudsakhon_odom_node_tune.py
 test/test_copyright.py
 test/test_flake8.py

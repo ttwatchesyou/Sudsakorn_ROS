@@ -1,0 +1,37 @@
+[3.293s] Invoking command in '/home/ubuntu/ros2_ws/src/testnode': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/testnode/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/testnode/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/testnode build --build-base /home/ubuntu/ros2_ws/build/testnode/build install --record /home/ubuntu/ros2_ws/build/testnode/install.log --single-version-externally-managed install_data
+[3.978s] running egg_info
+[3.978s] creating ../../build/testnode/testnode.egg-info
+[4.004s] writing ../../build/testnode/testnode.egg-info/PKG-INFO
+[4.005s] writing dependency_links to ../../build/testnode/testnode.egg-info/dependency_links.txt
+[4.005s] writing entry points to ../../build/testnode/testnode.egg-info/entry_points.txt
+[4.006s] writing requirements to ../../build/testnode/testnode.egg-info/requires.txt
+[4.007s] writing top-level names to ../../build/testnode/testnode.egg-info/top_level.txt
+[4.008s] writing manifest file '../../build/testnode/testnode.egg-info/SOURCES.txt'
+[4.052s] reading manifest file '../../build/testnode/testnode.egg-info/SOURCES.txt'
+[4.053s] writing manifest file '../../build/testnode/testnode.egg-info/SOURCES.txt'
+[4.053s] running build
+[4.054s] running build_py
+[4.054s] creating /home/ubuntu/ros2_ws/build/testnode/build
+[4.054s] creating /home/ubuntu/ros2_ws/build/testnode/build/lib
+[4.054s] creating /home/ubuntu/ros2_ws/build/testnode/build/lib/testnode
+[4.055s] copying testnode/nodetest_node.py -> /home/ubuntu/ros2_ws/build/testnode/build/lib/testnode
+[4.055s] copying testnode/__init__.py -> /home/ubuntu/ros2_ws/build/testnode/build/lib/testnode
+[4.055s] running install
+[4.064s] running install_lib
+[4.088s] creating /home/ubuntu/ros2_ws/install/testnode/lib/python3.12/site-packages/testnode
+[4.088s] copying /home/ubuntu/ros2_ws/build/testnode/build/lib/testnode/nodetest_node.py -> /home/ubuntu/ros2_ws/install/testnode/lib/python3.12/site-packages/testnode
+[4.088s] copying /home/ubuntu/ros2_ws/build/testnode/build/lib/testnode/__init__.py -> /home/ubuntu/ros2_ws/install/testnode/lib/python3.12/site-packages/testnode
+[4.088s] byte-compiling /home/ubuntu/ros2_ws/install/testnode/lib/python3.12/site-packages/testnode/nodetest_node.py to nodetest_node.cpython-312.pyc
+[4.089s] byte-compiling /home/ubuntu/ros2_ws/install/testnode/lib/python3.12/site-packages/testnode/__init__.py to __init__.cpython-312.pyc
+[4.089s] running install_data
+[4.089s] creating /home/ubuntu/ros2_ws/install/testnode/share/ament_index
+[4.090s] creating /home/ubuntu/ros2_ws/install/testnode/share/ament_index/resource_index
+[4.090s] creating /home/ubuntu/ros2_ws/install/testnode/share/ament_index/resource_index/packages
+[4.090s] copying resource/testnode -> /home/ubuntu/ros2_ws/install/testnode/share/ament_index/resource_index/packages
+[4.090s] copying package.xml -> /home/ubuntu/ros2_ws/install/testnode/share/testnode
+[4.091s] running install_egg_info
+[4.138s] Copying ../../build/testnode/testnode.egg-info to /home/ubuntu/ros2_ws/install/testnode/lib/python3.12/site-packages/testnode-0.1.0-py3.12.egg-info
+[4.139s] running install_scripts
+[4.341s] Installing nodetest_node script to /home/ubuntu/ros2_ws/install/testnode/lib/testnode
+[4.342s] writing list of installed files to '/home/ubuntu/ros2_ws/build/testnode/install.log'
+[4.347s] Invoked command in '/home/ubuntu/ros2_ws/src/testnode' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/testnode/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/testnode/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/testnode build --build-base /home/ubuntu/ros2_ws/build/testnode/build install --record /home/ubuntu/ros2_ws/build/testnode/install.log --single-version-externally-managed install_data

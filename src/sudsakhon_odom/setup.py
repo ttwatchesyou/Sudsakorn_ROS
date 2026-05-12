@@ -24,7 +24,6 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'sudsakhon_odom_node = sudsakhon_odom.sudsakhon_odom_node:main',
             'sudsakhon_odom_tune = sudsakhon_odom.sudsakhon_odom_node_tune:main',
         ],
     },

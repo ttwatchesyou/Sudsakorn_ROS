@@ -422,7 +422,7 @@ sllidar_node: /opt/ros/jazzy/lib/libbuiltin_interfaces__rosidl_typesupport_fastr
 sllidar_node: /opt/ros/jazzy/lib/librosidl_typesupport_fastrtps_cpp.so
 sllidar_node: /opt/ros/jazzy/lib/librmw.so
 sllidar_node: /opt/ros/jazzy/lib/librosidl_dynamic_typesupport.so
-sllidar_node: /home/ubuntu/install/fastcdr/lib/libfastcdr.so.2.2.7
+sllidar_node: /opt/ros/jazzy/lib/libfastcdr.so.2.2.7
 sllidar_node: /opt/ros/jazzy/lib/libbuiltin_interfaces__rosidl_typesupport_introspection_cpp.so
 sllidar_node: /opt/ros/jazzy/lib/librosidl_typesupport_introspection_cpp.so
 sllidar_node: /opt/ros/jazzy/lib/librosidl_typesupport_introspection_c.so

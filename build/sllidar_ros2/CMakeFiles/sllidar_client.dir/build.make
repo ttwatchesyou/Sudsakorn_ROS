@@ -166,7 +166,7 @@ sllidar_client: /opt/ros/jazzy/lib/libbuiltin_interfaces__rosidl_typesupport_fas
 sllidar_client: /opt/ros/jazzy/lib/librosidl_typesupport_fastrtps_cpp.so
 sllidar_client: /opt/ros/jazzy/lib/librmw.so
 sllidar_client: /opt/ros/jazzy/lib/librosidl_dynamic_typesupport.so
-sllidar_client: /home/ubuntu/install/fastcdr/lib/libfastcdr.so.2.2.7
+sllidar_client: /opt/ros/jazzy/lib/libfastcdr.so.2.2.7
 sllidar_client: /opt/ros/jazzy/lib/libbuiltin_interfaces__rosidl_typesupport_introspection_cpp.so
 sllidar_client: /opt/ros/jazzy/lib/librosidl_typesupport_introspection_cpp.so
 sllidar_client: /opt/ros/jazzy/lib/librosidl_typesupport_introspection_c.so
