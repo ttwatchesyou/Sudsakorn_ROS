@@ -1,0 +1,21 @@
+[2.074s] Invoking command in '/home/ubuntu/ros2_ws/src/sudsakhon_transformation': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_transformation/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_transformation/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_transformation build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_transformation/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_transformation/install.log --single-version-externally-managed install_data
+[2.326s] running egg_info
+[2.344s] writing ../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info/PKG-INFO
+[2.345s] writing dependency_links to ../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info/dependency_links.txt
+[2.345s] writing entry points to ../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info/entry_points.txt
+[2.346s] writing requirements to ../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info/requires.txt
+[2.346s] writing top-level names to ../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info/top_level.txt
+[2.386s] reading manifest file '../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info/SOURCES.txt'
+[2.388s] writing manifest file '../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info/SOURCES.txt'
+[2.388s] running build
+[2.389s] running build_py
+[2.389s] running install
+[2.395s] running install_lib
+[2.414s] running install_data
+[2.414s] running install_egg_info
+[2.434s] removing '/home/ubuntu/ros2_ws/install/sudsakhon_transformation/lib/python3.12/site-packages/sudsakhon_transformation-0.0.0-py3.12.egg-info' (and everything under it)
+[2.438s] Copying ../../build/sudsakhon_transformation/sudsakhon_transformation.egg-info to /home/ubuntu/ros2_ws/install/sudsakhon_transformation/lib/python3.12/site-packages/sudsakhon_transformation-0.0.0-py3.12.egg-info
+[2.438s] running install_scripts
+[2.552s] Installing transformation script to /home/ubuntu/ros2_ws/install/sudsakhon_transformation/lib/sudsakhon_transformation
+[2.553s] writing list of installed files to '/home/ubuntu/ros2_ws/build/sudsakhon_transformation/install.log'
+[2.584s] Invoked command in '/home/ubuntu/ros2_ws/src/sudsakhon_transformation' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_transformation/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_transformation/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_transformation build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_transformation/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_transformation/install.log --single-version-externally-managed install_data

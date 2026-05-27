@@ -1,0 +1,21 @@
+[2.399s] Invoking command in '/home/ubuntu/ros2_ws/src/sudsakhon_automation': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_automation/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_automation/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_automation build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_automation/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_automation/install.log --single-version-externally-managed install_data
+[2.957s] running egg_info
+[2.992s] writing ../../build/sudsakhon_automation/sudsakhon_automation.egg-info/PKG-INFO
+[2.992s] writing dependency_links to ../../build/sudsakhon_automation/sudsakhon_automation.egg-info/dependency_links.txt
+[2.992s] writing entry points to ../../build/sudsakhon_automation/sudsakhon_automation.egg-info/entry_points.txt
+[2.992s] writing requirements to ../../build/sudsakhon_automation/sudsakhon_automation.egg-info/requires.txt
+[2.993s] writing top-level names to ../../build/sudsakhon_automation/sudsakhon_automation.egg-info/top_level.txt
+[3.061s] reading manifest file '../../build/sudsakhon_automation/sudsakhon_automation.egg-info/SOURCES.txt'
+[3.062s] writing manifest file '../../build/sudsakhon_automation/sudsakhon_automation.egg-info/SOURCES.txt'
+[3.062s] running build
+[3.062s] running build_py
+[3.062s] running install
+[3.070s] running install_lib
+[3.104s] running install_data
+[3.105s] running install_egg_info
+[3.141s] removing '/home/ubuntu/ros2_ws/install/sudsakhon_automation/lib/python3.12/site-packages/sudsakhon_automation-0.0.0-py3.12.egg-info' (and everything under it)
+[3.151s] Copying ../../build/sudsakhon_automation/sudsakhon_automation.egg-info to /home/ubuntu/ros2_ws/install/sudsakhon_automation/lib/python3.12/site-packages/sudsakhon_automation-0.0.0-py3.12.egg-info
+[3.151s] running install_scripts
+[3.276s] Installing bridge_node script to /home/ubuntu/ros2_ws/install/sudsakhon_automation/lib/sudsakhon_automation
+[3.276s] writing list of installed files to '/home/ubuntu/ros2_ws/build/sudsakhon_automation/install.log'
+[3.314s] Invoked command in '/home/ubuntu/ros2_ws/src/sudsakhon_automation' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_automation/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_automation/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_automation build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_automation/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_automation/install.log --single-version-externally-managed install_data

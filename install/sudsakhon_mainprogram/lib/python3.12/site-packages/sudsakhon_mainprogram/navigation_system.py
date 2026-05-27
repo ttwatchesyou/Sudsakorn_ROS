@@ -13,6 +13,7 @@ class NavigationSystem:
            ป้องกัน odometry drift ตอนหุ่นเกือบหยุด
     FIX 3: Phase 1 LOCK_Y velocity frame ตรวจสอบแล้ว + เพิ่ม TOL hysteresis
            ป้องกัน oscillate รอบ TOL แล้วไม่ advance
+    FIX 4: 🌟 เพิ่ม Feedback Control ดึงหุ่นกลับเข้าเส้นโค้งแบบ Real-time
     """
 
     def __init__(self, node):
@@ -48,17 +49,13 @@ class NavigationSystem:
         self._log_throttle      = 0.0
 
         # ── Bezier curve tuning ───────────────────────────────────────────────
-        # curve_strength  : 0.0=เส้นตรง → 0.3=โค้งกลาง
-        #                   ลดเพื่อให้โค้งแคบลงในแกน X
-        self.default_curve_strength   = 0.15  # ลดจาก 0.3 → โค้งแคบครึ่ง
+        self.default_curve_strength   = 0.15 
 
-        # bezier_decel_ratio : สัดส่วน dist_full ที่เริ่มเบรก
-        #                      ลด → เบรกช้า → ยังเร็วนานกว่า → โค้งแคบขึ้น
-        self.bezier_decel_ratio       = 0.25  # ลดจาก 0.40
+        self.bezier_decel_ratio       = 0.25 
 
-        # bezier_curve_speed_ratio : cap speed ตลอดช่วงโค้ง (% ของ cruise)
-        #                            ลด → หุ่นช้าลง → drift น้อย → โค้งแคบ
-        self.bezier_curve_speed_ratio = 0.65  # ใช้ 65% ของ cruise speed
+        self.bezier_curve_speed_ratio = 0.65 
+
+        self.Kp = 1.5 # 🌟 จูนตรงนี้! ถ้าหลุด 10 cm ให้ใส่ประมาณ 3.0 - 4.5
 
         # ── DIRECT state ──────────────────────────────────────────────────────
         self.slow_down_radius = 0.50
@@ -69,6 +66,8 @@ class NavigationSystem:
     # ══════════════════════════════════════════════════════════════════════════
     def set_goal(self, x, y, yaw, curr_x, curr_y, mode="DIRECT",
                  cruise_speed=None, rotate_speed=None, ramp_time=0.4):
+        self.is_active      = True
+        self.arrived        = False
         self.goal_x       = x
         self.goal_y       = y
         self.goal_yaw     = yaw
@@ -79,8 +78,7 @@ class NavigationSystem:
         self.current_rotate = rotate_speed or self.default_rotate_speed
         self.ramp_duration  = ramp_time
         self.start_time     = time.time()
-        self.is_active      = True
-        self.arrived        = False
+        
         self.node.get_logger().info(
             f"📍 Goal:({x:.2f},{y:.2f}) speed:{self.current_cruise}")
 
@@ -89,7 +87,7 @@ class NavigationSystem:
     # ══════════════════════════════════════════════════════════════════════════
     def set_bezier_goal(self, x, y, curr_x, curr_y, curr_yaw,
                         curve_side="AUTO", cruise_speed=None,
-                        curve_strength=None):
+                        curve_strength=None,curve_kp=1.5):
         self.goal_x       = x
         self.goal_y       = y
         self.goal_yaw     = curr_yaw   # หน้าคงเดิม
@@ -105,6 +103,7 @@ class NavigationSystem:
         self._bezier_t        = 0.0
         self._phase_stop_tick = False
         self._log_throttle    = 0.0
+        self.Kp = curve_kp
         _curve_strength = curve_strength if curve_strength is not None \
                           else self.default_curve_strength
 
@@ -192,7 +191,7 @@ class NavigationSystem:
         cmd = Twist()
         cmd.linear.x  = local_x
         cmd.linear.y  = local_y
-        cmd.angular.z = 0.0
+        cmd.angular.z = vz
         return cmd, False
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -200,9 +199,7 @@ class NavigationSystem:
     # ══════════════════════════════════════════════════════════════════════════
     def _calc_bezier(self, curr_x, curr_y, curr_yaw):
         """
-        Phase 0 CURVE : วิ่งตาม Bezier tangent + log X,Y error ทุก 0.2s
-                        เข้า LOCK_Y เมื่อ dist < _lock_gap (ค่า default 0.30m)
-                        แทนที่จะคำนวณจาก decel_radius แบบเดิม
+        Phase 0 CURVE : วิ่งตาม Bezier tangent + Feedback ดึงเข้าเส้น
         Phase 1 LOCK_Y: หยุด X แก้ Y ด้วย P control
         Phase 2 LOCK_X: หยุด Y แก้ X ด้วย P control → arrived
         """
@@ -217,11 +214,9 @@ class NavigationSystem:
         MAX_SPD_LOCK = 0.35   # m/s สูงสุดขณะ lock
         MIN_CURVE_SPD = 0.05  # m/s floor ป้องกัน drift ตอน decel
 
-        # decel radius ยังใช้สำหรับ slow down curve แต่ไม่ใช้ trigger LOCK_Y แล้ว
         decel_radius = max(dist_full * self.bezier_decel_ratio, 0.30)
 
         # ── Phase advance ────────────────────────────────────────────────────
-        # trigger LOCK_Y เมื่อ dist < _lock_gap (0.30m) หรือ t=1.0 แล้วยังไม่ถึง
         if self._bezier_phase == 0 and (dist < self._lock_gap or self._bezier_t >= 1.0):
             self._bezier_phase    = 1
             self._phase_stop_tick = True
@@ -235,21 +230,22 @@ class NavigationSystem:
             self.node.get_logger().info(
                 f"🔒 LOCK_X triggered  err_x:{err_x:.3f}  err_y:{err_y:.3f}")
 
-        # หยุด 1 tick หลัง advance เพื่อล้าง residual velocity
         if self._phase_stop_tick:
             self._phase_stop_tick = False
             return Twist(), False
 
         # ────────────────────────────────────────────────────────────────────
-        # PHASE 0 : CURVE + DECEL  (พร้อม log X,Y error ทุก 0.2s)
+        # PHASE 0 : CURVE + DECEL + 🌟 FEEDBACK CONTROL
         # ────────────────────────────────────────────────────────────────────
         if self._bezier_phase == 0:
             p0x, p0y = self.start_x, self.start_y
             p1x, p1y = self._p1_x, self._p1_y
 
-            # หา t ที่ใกล้ position ปัจจุบันมากที่สุด (look-ahead เล็กน้อย)
+            # หา t ที่ใกล้ position ปัจจุบันมากที่สุด
             best_t = self._bezier_t
             best_d = float('inf')
+            expected_x, expected_y = curr_x, curr_y # ค่าตั้งต้น
+            
             for i in range(15):
                 ti = min(self._bezier_t + i*0.015, 1.0)
                 bx = (1-ti)**2*p0x + 2*(1-ti)*ti*p1x + ti**2*p2x
@@ -257,19 +253,18 @@ class NavigationSystem:
                 d  = math.sqrt((bx-curr_x)**2 + (by-curr_y)**2)
                 if d < best_d:
                     best_d = d; best_t = ti
+                    expected_x, expected_y = bx, by # จำพิกัดที่ควรจะอยู่ไว้ด้วย
+                    
             self._bezier_t = min(best_t, 1.0)
-
             t = self._bezier_t
 
-            # ถ้า t < 1.0 ใช้ Bezier tangent ปกติ
-            # ถ้า t = 1.0 (โค้งจบแล้ว) ให้ชี้ตรงไป goal ป้องกันวิ่งหนี
+            # Feedforward Vector (วิ่งตามเส้น)
             if t < 0.999:
                 tdx = 2*(1-t)*(p1x-p0x) + 2*t*(p2x-p1x)
                 tdy = 2*(1-t)*(p1y-p0y) + 2*t*(p2y-p1y)
                 mag = math.sqrt(tdx**2 + tdy**2) or 1.0
                 nx, ny = tdx/mag, tdy/mag
             else:
-                # direct-to-goal vector เมื่อ curve จบแล้ว
                 mag = dist or 1.0
                 nx, ny = err_x/mag, err_y/mag
 
@@ -281,28 +276,51 @@ class NavigationSystem:
             else:
                 decel_scale = 1.0
 
-            # cap ด้วย curve_speed_ratio ป้องกันหุ่นเร็วเกินช่วงโค้ง
             max_curve_spd = self.current_cruise * self.bezier_curve_speed_ratio
-            speed = max_curve_spd * ramp_scale * decel_scale
-            speed = max(speed, MIN_CURVE_SPD)
+            ff_speed = max_curve_spd * ramp_scale * decel_scale
+            ff_speed = max(ff_speed, MIN_CURVE_SPD)
 
-            vx_g    = nx * speed
-            vy_g    = ny * speed
-            local_x =  vx_g * math.cos(curr_yaw) + vy_g * math.sin(curr_yaw)
-            local_y = -vx_g * math.sin(curr_yaw) + vy_g * math.cos(curr_yaw)
+            # -------------------------------------------------------------
+            # 🌟 ส่วนที่เพิ่มเข้ามา: Feedback Control (ดึงหุ่นสู้แรงสลิป)
+            # -------------------------------------------------------------
+              # ⚙️ จูนตรงนี้! ถ้าหลุด 10 cm ให้ใส่ประมาณ 3.0 - 4.5
+            fb_vx = self.Kp * (expected_x - curr_x)
+            fb_vy = self.Kp * (expected_y - curr_y)
+            
+            # รวมความเร็ว (เดินหน้า + สไลด์ดึงข้าง)
+            global_vx = (nx * ff_speed) + fb_vx
+            global_vy = (ny * ff_speed) + fb_vy
+            
+            # จำกัดความเร็วรวมไม่ให้กระชากเกินขีดจำกัด (ยอมให้เร่งช่วยได้ 30%)
+            speed_mag = math.sqrt(global_vx**2 + global_vy**2)
+            max_allowed = ff_speed * 1.3 
+            if speed_mag > max_allowed:
+                global_vx = (global_vx / speed_mag) * max_allowed
+                global_vy = (global_vy / speed_mag) * max_allowed
+            # -------------------------------------------------------------
 
-            # log X,Y error ทุก 0.2s ไม่ท่วม terminal
+            # Transform Global -> Local (Mecanum Frame)
+            local_x =  global_vx * math.cos(curr_yaw) + global_vy * math.sin(curr_yaw)
+            local_y = -global_vx * math.sin(curr_yaw) + global_vy * math.cos(curr_yaw)
+
             now = time.time()
             if now - self._log_throttle >= 0.2:
                 self._log_throttle = now
                 self.node.get_logger().info(
-                    f"[CURVE] t:{t:.2f}  dist:{dist:.3f}m  "
-                    f"err_x:{err_x:.3f}  err_y:{err_y:.3f}  "
-                    f"spd:{speed:.2f}  lx:{local_x:.2f}  ly:{local_y:.2f}")
+                    f"[CURVE+FB] t:{t:.2f}  dist:{dist:.3f}m  "
+                    f"err_drift:{best_d:.3f}m  "
+                    f"lx:{local_x:.2f}  ly:{local_y:.2f}")
+
+            # รักษาหน้าหุ่น (Yaw)
+            yaw_err = self.goal_yaw - curr_yaw
+            while yaw_err >  math.pi: yaw_err -= 2*math.pi
+            while yaw_err < -math.pi: yaw_err += 2*math.pi
+            v_yaw = 2.0 * yaw_err
 
             cmd = Twist()
             cmd.linear.x = local_x
             cmd.linear.y = local_y
+            cmd.angular.z = v_yaw
             return cmd, False
 
         # ────────────────────────────────────────────────────────────────────
@@ -310,13 +328,11 @@ class NavigationSystem:
         # ────────────────────────────────────────────────────────────────────
         if self._bezier_phase == 1:
             if abs(err_y) <= TOL_ENTER:
-                # อยู่ในโซน tolerance แล้ว หยุดรอ TOL_HOLD ตรวจจาก advance ข้างบน
                 return Twist(), False
 
             spd_y = err_y * 2.0
             spd_y = max(min(spd_y, MAX_SPD_LOCK), -MAX_SPD_LOCK)
 
-            # global(vy=spd_y, vx=0) → robot frame
             local_x =  spd_y * math.sin(curr_yaw)
             local_y =  spd_y * math.cos(curr_yaw)
 
@@ -343,7 +359,6 @@ class NavigationSystem:
             spd_x = err_x * 2.0
             spd_x = max(min(spd_x, MAX_SPD_LOCK), -MAX_SPD_LOCK)
 
-            # global(vx=spd_x, vy=0) → robot frame
             local_x =  spd_x * math.cos(curr_yaw)
             local_y = -spd_x * math.sin(curr_yaw)
 

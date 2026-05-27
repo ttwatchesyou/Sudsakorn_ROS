@@ -1,0 +1,207 @@
+                # โหมด Lidar Approach (❌ ห้ามใส่ and self.arrived() ตรงนี้เด็ดขาด)
+                # elif self.mission_step == 6.5: 
+                #     print(f"Lidar Dist: {self.Lidar_center_dist}") # ปรินต์เช็คค่าได้ปกติ
+                    
+                #     if self.lidar_approach(self.Lidar_center_dist,
+                #                         direction='x+',
+                #                         stop_dist=0.25,
+                #                         slow_dist=0.30,
+                #                         cruise_speed=0.20,
+                #                         slow_speed=0.06):
+                #         self.next_step(70)
+
+                # elif self.mission_step == 7:
+                #     self.go_to(-2.5, -1.85, 180,
+                #             speed_limit=1.0,
+                #             pos_pid=[1.23, 0.0, 0.0])
+                #     self.next_step(8)
+
+
+                # # รอให้วิ่ง Curve เสร็จ
+                # elif self.mission_step == 8 and self.arrived():
+                #     # ถึงจุด Curve แล้ว เด้งไปโหมด Lidar
+                #     self.next_step(8.5) 
+
+                # # โหมด Lidar Approach (❌ ห้ามใส่ and self.arrived() ตรงนี้เด็ดขาด)
+                # elif self.mission_step == 8.5: 
+                #     print(f"Lidar Dist: {self.Lidar_center_dist}") # ปรินต์เช็คค่าได้ปกติ
+                    
+                #     if self.lidar_approach(self.Lidar_center_dist,
+                #                         direction='x+',
+                #                         stop_dist=0.25,
+                #                         slow_dist=0.30,
+                #                         cruise_speed=0.20,
+                #                         slow_speed=0.06):
+                #         self.next_step(9)
+
+                # elif self.mission_step == 9 :
+                #     self.go_to(-2.2, -1.85, 180,
+                #             speed_limit=1.0,
+                #             pos_pid=[1.25, 0.0, 0.0])
+                #     self.next_step(10)
+                
+                # elif self.mission_step == 10 and self.arrived():
+                #     self.go_to(-2.3, -1.85, 180,
+                #             speed_limit=1.0,
+                #             pos_pid=[1.25, 0.0, 0.0])
+                #     self.next_step(10.5)
+
+                # elif self.mission_step == 10.5 and self.arrived():
+                #     self.go_to(-2.3, -4, 180,
+                #             speed_limit=1.0,
+                #             pos_pid=[1.25, 0.0, 0.0])
+                #     self.next_step(11)
+
+        '''
+        
+        # ────────────────────────────────────────────────────────────────────
+        # STEP 0 — รอกดปุ่มเริ่ม
+        # ────────────────────────────────────────────────────────────────────
+        if self.mission_step == 0:
+            if self.sensors.sw1 == 0:
+                self.get_logger().info('🔘 เริ่มภารกิจ!')
+                self.bucket_system.out_pos()
+                self.slide_system.enable()
+                self.slide_system.down()
+                self.go_to(0.0, 0.0, 0.0,
+                           speed_limit=0.5,
+                           pos_pid=[13.5, 0.00002, 4.8])
+                self.next_step(1)
+
+        # ────────────────────────────────────────────────────────────────────
+        # STEP 1 — วิ่งไปจุดที่ 2
+        # ────────────────────────────────────────────────────────────────────
+        elif self.mission_step == 1 and self.arrived():
+            self.go_to(-0.50, 0.0, 0.0,
+                       speed_limit=1.6,
+                       pos_pid=[13.5, 0.00002, 6.5])
+            self.next_step(2)
+
+        # ────────────────────────────────────────────────────────────────────
+        # STEP 2 — ถึงจุด 2 → ทำ task ต่อ (เพิ่มเองตรงนี้)
+        # ────────────────────────────────────────────────────────────────────
+        elif self.mission_step == 2 and self.arrived():
+            # ตัวอย่าง: เปิด servo แล้วไปต่อ
+            self.do_servo(self.servo_system.PullBox, 'on', delay_after=0.5)
+            self.do_servo(self.servo_system.PullBox, 'off', delay_after=0.0)
+            self.next_step(3)
+
+        # ────────────────────────────────────────────────────────────────────
+        # STEP 3 — คลานเข้าโต๊ะ (ใช้ Lidar)
+        # ────────────────────────────────────────────────────────────────────
+        elif self.mission_step == 3:
+            if self.Lidar_center_dist is not None:
+                if self.Lidar_center_dist <= 0.38:
+                    self.set_manual_velocity(0.06, 0.0)
+                else:
+                    self.set_manual_velocity(0.10, 0.0)
+
+                # ถึงระยะ → หยุดแล้วไป step ถัดไป
+                if self.Lidar_center_dist <= 0.30:
+                    self.set_manual_velocity(0.0, 0.0)
+                    self.next_step(4)
+
+        # ────────────────────────────────────────────────────────────────────
+        # STEP 7.1 — Case 1 เก้าอี้
+        # ────────────────────────────────────────────────────────────────────
+        elif self.mission_step == 7.1:
+            self.do_servo(self.servo_system.PullBox, 'on',  delay_after=0.5)
+            self.do_servo(self.servo_system.PullBox, 'off', delay_after=0.0)
+            self.slide_system.enable()
+            self.slide_system.down()
+            self.next_step(7.11)
+
+        elif self.mission_step == 7.11:
+            if self.wait_sensor(self.sensors.bottle_detected, expected=0):
+                # ขวดมาแล้ว
+                self.bottle_system.disable()
+                self.bottle_system.out_pos()
+                time.sleep(0.5)
+                self.do_servo(self.servo_system.BlockBottle, 'on', delay_after=0.0)
+                self.sleep_move(-0.25, 0.0, duration=0.75)
+                self.do_servo(self.servo_system.BlockBottle, 'off', delay_after=0.0)
+                self.next_step(8)
+            else:
+                # รอขวด
+                self.bottle_system.enable()
+                self.bottle_system.out_pos()
+
+        # ────────────────────────────────────────────────────────────────────
+        # STEP 7.2 — Case 2 เก้าอี้
+        # ────────────────────────────────────────────────────────────────────
+        elif self.mission_step == 7.2:
+            if self.wait_sensor(self.sensors.box_detected, expected=0):
+                self.do_servo(self.servo_system.PullBox, 'on',  delay_after=0.5)
+                self.do_servo(self.servo_system.PullBox, 'off', delay_after=1.5)
+                self.slide_system.enable()
+                self.slide_system.up()
+                self.next_step(7.21)
+
+        elif self.mission_step == 7.21:
+            if self.wait_sensor(self.sensors.box_detected, expected=0) \
+                    and self.counterboxout >= 1:
+                self.do_servo(self.servo_system.PullBox, 'on',  delay_after=0.5)
+                self.do_servo(self.servo_system.PullBox, 'off', delay_after=0.0)
+                self.get_logger().info('---> Case Ok')
+                self.next_step(7.22)
+            else:
+                self.counterboxout += 1
+                self.get_logger().info(f'---> Up {self.counterboxout}')
+
+        elif self.mission_step == 7.22:
+            if self.wait_sensor(self.sensors.bottle_detected, expected=0):
+                self.bottle_system.disable()
+                self.bottle_system.out_pos()
+                time.sleep(0.5)
+                self.do_servo(self.servo_system.BlockBottle, 'on', delay_after=0.0)
+                self.next_step(7.23)
+            else:
+                self.bottle_system.enable()
+                self.bottle_system.out_pos()
+
+        elif self.mission_step == 7.23:
+            if self.wait_sensor(self.sensors.table_l, expected=1):
+                self.do_servo(self.servo_system.BlockBottle, 'off', delay_after=0.2)
+                self.sleep_move(0.0, -0.15, duration=0.8)
+                self.next_step(7.24)
+            else:
+                self.set_manual_velocity(0.0, 0.15)
+
+        elif self.mission_step == 7.24:
+            if self.wait_sensor(self.sensors.bottle_detected, expected=0):
+                self.bottle_system.disable()
+                self.bottle_system.out_pos()
+                time.sleep(0.5)
+                self.do_servo(self.servo_system.BlockBottle, 'on', delay_after=0.0)
+                self.sleep_move(-0.15, 0.0, duration=0.85)
+                self.do_servo(self.servo_system.BlockBottle, 'off', delay_after=0.0)
+                self.next_step(8)
+            else:
+                self.bottle_system.enable()
+                self.bottle_system.out_pos()
+
+        # ────────────────────────────────────────────────────────────────────
+        # STEP 8 → 9 → 10 → 11 — วิ่งกลับ
+        # ────────────────────────────────────────────────────────────────────
+        elif self.mission_step == 8:
+            self.slide_system.enable()
+            self.slide_system.down()
+            self.go_to(-0.48, -0.45, 0.0,
+                       speed_limit=1.4,
+                       pos_pid=[6.5, 0.00002, 3.0])
+            self.next_step(9)
+
+        elif self.mission_step == 9 and self.arrived():
+            self.next_step(10)
+
+        elif self.mission_step == 10:
+            self.go_to(-0.48, -0.95, 0.0,
+                       speed_limit=1.4,
+                       pos_pid=[6.5, 0.00002, 3.0])
+            self.next_step(11)
+
+        elif self.mission_step == 11 and self.arrived():
+            self.slide_system.enable()
+            self.slide_system.down()
+            self.next_step(12)
+        '''

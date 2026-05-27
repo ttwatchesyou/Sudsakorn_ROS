@@ -12,6 +12,7 @@ resource/sudsakhon_mainprogram
 sudsakhon_mainprogram/__init__.py
 sudsakhon_mainprogram/actuators.py
 sudsakhon_mainprogram/main_controller.py
+sudsakhon_mainprogram/navigation_system copy.py
 sudsakhon_mainprogram/navigation_system.py
 sudsakhon_mainprogram/sensor_system.py
 sudsakhon_mainprogram/servo_system.py

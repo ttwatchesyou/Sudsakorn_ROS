@@ -1,0 +1,5 @@
+  File "/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/lib/python3.12/site-packages/sudsakhon_mainprogram/main_controller.py", line 637
+    elif self.mission_step == 12.2: 
+    ^^^^
+SyntaxError: invalid syntax
+

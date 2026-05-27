@@ -38,6 +38,26 @@ class SudsakhonSerialBridge(Node):
             cmd = f"C,{msg.data[0]},{msg.data[1]},{msg.data[2]},{msg.data[3]}\n"
             self.ser.write(cmd.encode())
 
+    # def control_callback(self, msg):
+    #     """ รับค่า [bottleL, bottleR, box, slide] แล้วส่งลง Serial """
+    #     if len(msg.data) >= 4:
+    #         bottleL = msg.data[0]
+    #         bottleR = msg.data[1]
+    #         box = msg.data[2]
+    #         slide = msg.data[3]
+
+    #         is_box_up = (box == "up" or box == 1)
+            
+    #         is_slide_working = (slide != "stop" and slide != 0)
+        
+    #         is_sensor_triggered = getattr(self, 'sensor_triggered', False) 
+
+    #         if is_box_up and (is_sensor_triggered or is_slide_working):
+    #             box = "stop" if isinstance(msg.data[2], str) else 0
+                
+    #         cmd = f"C,{bottleL},{bottleR},{box},{slide}\n"
+    #         self.ser.write(cmd.encode())
+
     def servo_callback(self, msg):
         """ รับค่า [channel, angle] แล้วส่งลง Serial """
         if len(msg.data) >= 2:

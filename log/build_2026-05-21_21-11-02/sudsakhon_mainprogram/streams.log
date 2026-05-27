@@ -1,0 +1,24 @@
+[2.102s] Invoking command in '/home/ubuntu/ros2_ws/src/sudsakhon_mainprogram': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_mainprogram/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_mainprogram build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_mainprogram/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_mainprogram/install.log --single-version-externally-managed install_data
+[2.478s] running egg_info
+[2.497s] writing ../../build/sudsakhon_mainprogram/sudsakhon_mainprogram.egg-info/PKG-INFO
+[2.498s] writing dependency_links to ../../build/sudsakhon_mainprogram/sudsakhon_mainprogram.egg-info/dependency_links.txt
+[2.498s] writing entry points to ../../build/sudsakhon_mainprogram/sudsakhon_mainprogram.egg-info/entry_points.txt
+[2.499s] writing requirements to ../../build/sudsakhon_mainprogram/sudsakhon_mainprogram.egg-info/requires.txt
+[2.499s] writing top-level names to ../../build/sudsakhon_mainprogram/sudsakhon_mainprogram.egg-info/top_level.txt
+[2.540s] reading manifest file '../../build/sudsakhon_mainprogram/sudsakhon_mainprogram.egg-info/SOURCES.txt'
+[2.541s] writing manifest file '../../build/sudsakhon_mainprogram/sudsakhon_mainprogram.egg-info/SOURCES.txt'
+[2.541s] running build
+[2.541s] running build_py
+[2.541s] copying sudsakhon_mainprogram/main_controller.py -> /home/ubuntu/ros2_ws/build/sudsakhon_mainprogram/build/lib/sudsakhon_mainprogram
+[2.542s] running install
+[2.549s] running install_lib
+[2.574s] copying /home/ubuntu/ros2_ws/build/sudsakhon_mainprogram/build/lib/sudsakhon_mainprogram/main_controller.py -> /home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/lib/python3.12/site-packages/sudsakhon_mainprogram
+[2.575s] byte-compiling /home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/lib/python3.12/site-packages/sudsakhon_mainprogram/main_controller.py to main_controller.cpython-312.pyc
+[2.580s] running install_data
+[2.580s] running install_egg_info
+[2.606s] removing '/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/lib/python3.12/site-packages/sudsakhon_mainprogram-0.0.0-py3.12.egg-info' (and everything under it)
+[2.610s] Copying ../../build/sudsakhon_mainprogram/sudsakhon_mainprogram.egg-info to /home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/lib/python3.12/site-packages/sudsakhon_mainprogram-0.0.0-py3.12.egg-info
+[2.610s] running install_scripts
+[2.861s] Installing main_controller script to /home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/lib/sudsakhon_mainprogram
+[2.861s] writing list of installed files to '/home/ubuntu/ros2_ws/build/sudsakhon_mainprogram/install.log'
+[2.910s] Invoked command in '/home/ubuntu/ros2_ws/src/sudsakhon_mainprogram' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_mainprogram/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_mainprogram build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_mainprogram/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_mainprogram/install.log --single-version-externally-managed install_data

@@ -1,0 +1,21 @@
+[5.262s] Invoking command in '/home/ubuntu/ros2_ws/src/sudsakhon_odom': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_odom/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_odom/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_odom build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_odom/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_odom/install.log --single-version-externally-managed install_data
+[5.877s] running egg_info
+[5.928s] writing ../../build/sudsakhon_odom/sudsakhon_odom.egg-info/PKG-INFO
+[5.928s] writing dependency_links to ../../build/sudsakhon_odom/sudsakhon_odom.egg-info/dependency_links.txt
+[5.928s] writing entry points to ../../build/sudsakhon_odom/sudsakhon_odom.egg-info/entry_points.txt
+[5.929s] writing requirements to ../../build/sudsakhon_odom/sudsakhon_odom.egg-info/requires.txt
+[5.929s] writing top-level names to ../../build/sudsakhon_odom/sudsakhon_odom.egg-info/top_level.txt
+[6.078s] reading manifest file '../../build/sudsakhon_odom/sudsakhon_odom.egg-info/SOURCES.txt'
+[6.078s] writing manifest file '../../build/sudsakhon_odom/sudsakhon_odom.egg-info/SOURCES.txt'
+[6.078s] running build
+[6.078s] running build_py
+[6.079s] running install
+[6.103s] running install_lib
+[6.180s] running install_data
+[6.180s] running install_egg_info
+[6.270s] removing '/home/ubuntu/ros2_ws/install/sudsakhon_odom/lib/python3.12/site-packages/sudsakhon_odom-0.0.0-py3.12.egg-info' (and everything under it)
+[6.271s] Copying ../../build/sudsakhon_odom/sudsakhon_odom.egg-info to /home/ubuntu/ros2_ws/install/sudsakhon_odom/lib/python3.12/site-packages/sudsakhon_odom-0.0.0-py3.12.egg-info
+[6.274s] running install_scripts
+[6.595s] Installing sudsakhon_odom_tune script to /home/ubuntu/ros2_ws/install/sudsakhon_odom/lib/sudsakhon_odom
+[6.595s] writing list of installed files to '/home/ubuntu/ros2_ws/build/sudsakhon_odom/install.log'
+[6.607s] Invoked command in '/home/ubuntu/ros2_ws/src/sudsakhon_odom' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_odom/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_odom/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_odom build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_odom/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_odom/install.log --single-version-externally-managed install_data
