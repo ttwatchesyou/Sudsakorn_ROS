@@ -448,6 +448,7 @@ class SudsakhonBridge(Node):
         self.create_subscription(Int32, "/chair_count", self._chair_count_cb, 10)
         self.create_subscription(Int32, "/Program/Game", self._program_game_cb, 10)
         self.create_subscription(Float32, "/current_mission_step", self._mission_step_cb, 10)
+        self.create_subscription(Float32, "/mission_total_steps", self._mission_step_cb, 10)
 
         self.get_logger().info("SudsakhonBridge v5 ready (Mission Ready)")
 

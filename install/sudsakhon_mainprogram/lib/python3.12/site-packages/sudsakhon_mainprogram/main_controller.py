@@ -346,7 +346,7 @@ class SudSakhonMainController(Node):
                 self.next_step(3)
 
             elif self.mission_step == 3:
-                self.go_to(-2.25, -4.0, 0.0,speed_limit=1.0,pos_pid=[1.25, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+                self.go_to(-2.25, -4.0, 0.0,speed_limit=1.0,pos_pid=[1.30, 0.0, 0.0], yaw_pid=yaw_pid_Set)
                 self.Griper_R('hold')
                 self.Griper_L('hold')
                 self.next_step(4)
@@ -629,10 +629,15 @@ class SudSakhonMainController(Node):
                 self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
                 self.next_step(12.1)
 
-            '''
+            
 
             elif self.mission_step == 12.1 and self.arrived():
-                self.go_to(-2.375, -7.30, 180, speed_limit=0.6, pos_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+
+                target_x = (self.curr_x)
+                target_y = (self.curr_y) + (+0.8)
+
+                self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+                #self.go_to(-2.375, -7.30, 180, speed_limit=0.6, pos_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
                 self.detected_list = []
                 self.next_step(12.2)
 
@@ -640,7 +645,7 @@ class SudSakhonMainController(Node):
             
             elif self.mission_step == 12.2 and self.arrived(): 
                self.next_step(12.3)
-
+            
             elif self.mission_step == 12.3:
                 print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
                 # เอาข้อความที่ได้เก็บลง list
@@ -655,7 +660,7 @@ class SudSakhonMainController(Node):
                 
                 if self.lidar_approach(self.Lidar_center_dist,
                                     direction='x+',
-                                    stop_dist=0.35,
+                                    stop_dist=0.325,
                                     slow_dist=0.30,
                                     cruise_speed=0.20,
                                     slow_speed=0.06):
@@ -710,15 +715,22 @@ class SudSakhonMainController(Node):
                 self.ControlSlide('in')
                 time.sleep(0.3)
                 self.next_step(14)
-
+            
             elif self.mission_step == 14:
-                self.go_to(-2.40, -8.2, 180, speed_limit=0.8, pos_pid=[1.25, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+                target_x = (self.curr_x)
+                target_y = (self.curr_y) + (-0.8)
+                self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+                #self.go_to(-2.40, -8.2, 180, speed_limit=0.8, pos_pid=[1.25, 0.0, 0.0], yaw_pid=yaw_pid_Set)
                 self.next_step(14.1)
 
             elif self.mission_step == 14.1 and self.arrived():
-                self.go_to(-1.4, -8.2, 180, speed_limit=0.8, pos_pid=[1.25, 0.0, 0.0], yaw_pid=yaw_pid_Set)
-                self.next_step(14.2)
 
+                target_x = (self.curr_x) + (+1.0)
+                target_y = self.curr_y
+                self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+                #self.go_to(-1.4, -8.2, 180, speed_limit=0.8, pos_pid=[1.25, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+                self.next_step(14.2)
+            
             elif self.mission_step == 14.2 and self.arrived():
                 print(self.Lidar_center_dist)
                 print(f"self.Lidar_center_dist: '{self.Lidar_center_dist}'")
@@ -734,9 +746,9 @@ class SudSakhonMainController(Node):
                 self.next_step(15.1)
 
             elif self.mission_step == 15.1 and self.arrived():
-                self.go_to(-0.0, -0.0, 180, speed_limit=1.0, pos_pid=[1.30, 0.0, 0.0], yaw_pid=yaw_pid_Set)
-                self.next_step(15.1)
-            '''
+                self.go_to(-0.0, -2.0, 180, speed_limit=1.3, pos_pid=[1.35, 0.0, 0.0], yaw_pid=[80.0, 0.0, 200.0])
+                self.next_step(15.2)
+            
             
                 #self.next_step(11.5)
             
