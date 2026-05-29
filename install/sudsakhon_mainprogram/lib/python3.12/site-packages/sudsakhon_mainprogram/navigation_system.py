@@ -133,6 +133,59 @@ class NavigationSystem:
             f"P1:({self._p1_x:.2f},{self._p1_y:.2f}) "
             f"side:{curve_side} dist:{dist:.2f}m speed:{self.current_cruise}")
 
+    def set_bezier_goal_new(self, x, y, target_yaw, curr_x, curr_y, curr_yaw, 
+                        curve_side="AUTO", cruise_speed=None, 
+                        curve_strength=None, curve_kp=1.5):
+        
+        self.goal_x       = x
+        self.goal_y       = y
+        self.goal_yaw     = target_yaw   # เปลี่ยนให้รับค่ามุมเป้าหมายที่ต้องการ
+        
+        self.start_x      = curr_x
+        self.start_y      = curr_y
+        self.start_yaw    = curr_yaw     # เพิ่มการเก็บค่ามุมเริ่มต้น เพื่อนำไปใช้คำนวณระหว่างวิ่ง
+        
+        self.current_mode = "BEZIER"
+        self.current_cruise = cruise_speed or self.default_cruise_speed
+        self.ramp_duration  = 0.4
+        self.start_time     = time.time()
+        self.is_active      = True
+        self.arrived        = False
+        self._bezier_phase  = 0
+        self._bezier_t      = 0.0
+        self._phase_stop_tick = False
+        self._log_throttle    = 0.0
+        self.Kp = curve_kp
+        _curve_strength = curve_strength if curve_strength is not None \
+                          else self.default_curve_strength
+
+        # ── Control Point P1 ──────────────────────────────────────────────────
+        dist         = math.sqrt((x - curr_x)**2 + (y - curr_y)**2)
+        offset       = dist * _curve_strength
+        angle_path   = math.atan2(y - curr_y, x - curr_x)
+        perp         = angle_path + math.pi / 2.0
+
+        if curve_side == "LEFT":
+            sign =  1.0
+        elif curve_side == "RIGHT":
+            sign = -1.0
+        else:  # AUTO
+            dx    = x - curr_x
+            dy    = y - curr_y
+            cross = math.cos(curr_yaw)*dy - math.sin(curr_yaw)*dx
+            sign  = 1.0 if cross >= 0 else -1.0
+
+        mid_x      = (curr_x + x) / 2.0
+        mid_y      = (curr_y + y) / 2.0
+        self._p1_x = mid_x + sign * offset * math.cos(perp)
+        self._p1_y = mid_y + sign * offset * math.sin(perp)
+
+        self.node.get_logger().info(
+            f"🌀 Bezier:({x:.2f},{y:.2f}, yaw:{target_yaw:.2f}) "
+            f"P1:({self._p1_x:.2f},{self._p1_y:.2f}) "
+            f"side:{curve_side} dist:{dist:.2f}m speed:{self.current_cruise}"
+        )
+
     # ══════════════════════════════════════════════════════════════════════════
     # CALCULATE VELOCITY
     # ══════════════════════════════════════════════════════════════════════════
@@ -199,7 +252,7 @@ class NavigationSystem:
     # ══════════════════════════════════════════════════════════════════════════
     def _calc_bezier(self, curr_x, curr_y, curr_yaw):
         """
-        Phase 0 CURVE : วิ่งตาม Bezier tangent + Feedback ดึงเข้าเส้น
+        Phase 0 CURVE : วิ่งตาม Bezier tangent + Feedback ดึงเข้าเส้น + 🔄 หมุนตัวตามโค้ง
         Phase 1 LOCK_Y: หยุด X แก้ Y ด้วย P control
         Phase 2 LOCK_X: หยุด Y แก้ X ด้วย P control → arrived
         """
@@ -281,23 +334,19 @@ class NavigationSystem:
             ff_speed = max(ff_speed, MIN_CURVE_SPD)
 
             # -------------------------------------------------------------
-            # 🌟 ส่วนที่เพิ่มเข้ามา: Feedback Control (ดึงหุ่นสู้แรงสลิป)
+            # 🌟 Feedback Control (ดึงหุ่นสู้แรงสลิป)
             # -------------------------------------------------------------
-              # ⚙️ จูนตรงนี้! ถ้าหลุด 10 cm ให้ใส่ประมาณ 3.0 - 4.5
             fb_vx = self.Kp * (expected_x - curr_x)
             fb_vy = self.Kp * (expected_y - curr_y)
             
-            # รวมความเร็ว (เดินหน้า + สไลด์ดึงข้าง)
             global_vx = (nx * ff_speed) + fb_vx
             global_vy = (ny * ff_speed) + fb_vy
             
-            # จำกัดความเร็วรวมไม่ให้กระชากเกินขีดจำกัด (ยอมให้เร่งช่วยได้ 30%)
             speed_mag = math.sqrt(global_vx**2 + global_vy**2)
             max_allowed = ff_speed * 1.3 
             if speed_mag > max_allowed:
                 global_vx = (global_vx / speed_mag) * max_allowed
                 global_vy = (global_vy / speed_mag) * max_allowed
-            # -------------------------------------------------------------
 
             # Transform Global -> Local (Mecanum Frame)
             local_x =  global_vx * math.cos(curr_yaw) + global_vy * math.sin(curr_yaw)
@@ -311,11 +360,27 @@ class NavigationSystem:
                     f"err_drift:{best_d:.3f}m  "
                     f"lx:{local_x:.2f}  ly:{local_y:.2f}")
 
-            # รักษาหน้าหุ่น (Yaw)
-            yaw_err = self.goal_yaw - curr_yaw
-            while yaw_err >  math.pi: yaw_err -= 2*math.pi
-            while yaw_err < -math.pi: yaw_err += 2*math.pi
-            v_yaw = 2.0 * yaw_err
+            # -------------------------------------------------------------
+            # 🔄 รักษาและหมุนหน้าหุ่น (Yaw Interpolation)
+            # -------------------------------------------------------------
+            # ป้องกัน error กรณีบางจุดลืมประกาศ start_yaw ให้ใช้ curr_yaw ไปก่อน
+            s_yaw = getattr(self, 'start_yaw', curr_yaw)
+            
+            # 1. หาระยะห่างของมุม (เป้าหมาย - เริ่มต้น)
+            diff_yaw = self.goal_yaw - s_yaw
+            while diff_yaw >  math.pi: diff_yaw -= 2.0 * math.pi
+            while diff_yaw < -math.pi: diff_yaw += 2.0 * math.pi
+            
+            # 2. คำนวณมุมเป้าหมาย ณ เสี้ยววินาทีนี้ (ตามระยะความคืบหน้า t)
+            current_target_yaw = s_yaw + (diff_yaw * t)
+            
+            # 3. คำนวณ Error เพื่อสั่งมอเตอร์หมุน
+            yaw_err = current_target_yaw - curr_yaw
+            while yaw_err >  math.pi: yaw_err -= 2.0 * math.pi
+            while yaw_err < -math.pi: yaw_err += 2.0 * math.pi
+            
+            v_yaw = 2.0 * yaw_err # (2.0 คือค่า Gain การหมุนเดิมของคุณ สามารถปรับเปลี่ยนได้)
+            # -------------------------------------------------------------
 
             cmd = Twist()
             cmd.linear.x = local_x

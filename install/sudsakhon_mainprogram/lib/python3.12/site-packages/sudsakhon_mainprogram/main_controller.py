@@ -258,10 +258,19 @@ class SudSakhonMainController(Node):
             self.ControlBottle_R('down')
             self.ControlBottle_L('down')
             self.ControlBox('down')
+
+            self.go_to(-0.0, -4.0, 0.0, mode="DIRECT_STM32", speed_limit=1.0, pos_pid=[1.25, 0.0, 0.0], yaw_pid=[125.0, 0.0, 200.0])
+
+            #self.go_to_curve(-1.0, -1.0,yaw_deg=270, speed_limit=1.30, curve_strength=0.4, curve_side='AUTO',curve_kp_=1.5)
+            #self.go_to(-0.0, -0.0, 0.0, mode="DIRECT_STM32", speed_limit=1.0, pos_pid=[1.25, 0.0, 0.0], yaw_pid=[125.0, 0.0, 200.0])
+
             #self.go_to(-0.0, -0.0, 0.0, mode="DIRECT_STM32", speed_limit=1.0, pos_pid=[1.25, 0.0, 0.0], yaw_pid=[125.0, 0.0, 200.0])
             #self.go_to(-0.0, -0.0, 0.0,speed_limit=1.0,pos_pid=[1.25, 0.0, 0.0])
 
         if( self.sensors.SW_1 == 0 ):
+
+
+            self.go_to(-0.0, -0.0, 0.0, mode="DIRECT_STM32", speed_limit=1.0, pos_pid=[1.25, 0.0, 0.0], yaw_pid=[125.0, 0.0, 200.0])
             pass
             #self.go_to(-0.0, -0.0, 180.0, mode="DIRECT_STM32", speed_limit=1.0, pos_pid=[1.25, 0.0, 0.0], yaw_pid=[125.0, 0.0, 200.0])
             #self.go_to(-0.0, -0.0, 180.0,speed_limit=1.0,pos_pid=[1.25, 0.0, 0.0])
@@ -280,6 +289,7 @@ class SudSakhonMainController(Node):
                     self.ControlBottle_R('down')
                     self.ControlBottle_L('down')
                     self.ControlBox('down')
+                    self.ControlSlide('in')
                     self.set_pid_gains(5, 0.05, 0.0, 0.5)
                     self.get_logger().info('🔘 เริ่มภารกิจ!')
                     self.ChairCount_RUN = self.ChairCount
@@ -318,7 +328,7 @@ class SudSakhonMainController(Node):
                     
 
             elif self.mission_step == 2.5: 
-                if self.lidar_approach(self.Lidar_center_dist, direction='x+', stop_dist=0.21, slow_dist=0.30, cruise_speed=0.20, slow_speed=0.06):
+                if self.lidar_approach(self.Lidar_center_dist, direction='x+', stop_dist=0.25, slow_dist=0.30, cruise_speed=0.20, slow_speed=0.06):
                     
                     self.next_step(2.6)
                     
@@ -326,10 +336,10 @@ class SudSakhonMainController(Node):
                 
                 
 
-                time.sleep(0.2)
+                # time.sleep(0.2)
                 self.ControlBottle_R('stop')
                 self.ControlBottle_L('stop')
-                time.sleep(0.5)
+                time.sleep(0.15)
                 self.ControlSlide('out')
                 time.sleep(0.8)
                 self.Box_Pusher('unactive')
@@ -346,7 +356,7 @@ class SudSakhonMainController(Node):
                 self.next_step(3)
 
             elif self.mission_step == 3:
-                self.go_to(-2.25, -4.0, 0.0,speed_limit=1.0,pos_pid=[1.30, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+                self.go_to(-2.25, -4.0, 0.0,speed_limit=1.0,pos_pid=[1.10, 0.0, 0.0], yaw_pid=yaw_pid_Set)
                 self.Griper_R('hold')
                 self.Griper_L('hold')
                 self.next_step(4)
@@ -384,10 +394,10 @@ class SudSakhonMainController(Node):
                         self.next_step(4.7)
 
             elif self.mission_step == 4.7 :
-                time.sleep(0.2)
+                #time.sleep(0.2)
                 self.ControlBottle_R('stop')
                 self.ControlBottle_L('stop')
-                time.sleep(0.5)
+                time.sleep(0.15)
                 self.ControlSlide('out')
                 time.sleep(0.8)
                 self.Box_Pusher('unactive')
@@ -505,7 +515,7 @@ class SudSakhonMainController(Node):
             elif self.mission_step == 8:
                 self.go_to(-2.35, -1.85, 180,
                         speed_limit=1.0,
-                        pos_pid=[1.47, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+                        pos_pid=[1.10, 0.0, 0.0], yaw_pid=yaw_pid_Set)
 
                 
                 self.next_step(9)
@@ -660,7 +670,7 @@ class SudSakhonMainController(Node):
                 
                 if self.lidar_approach(self.Lidar_center_dist,
                                     direction='x+',
-                                    stop_dist=0.325,
+                                    stop_dist=0.25,
                                     slow_dist=0.30,
                                     cruise_speed=0.20,
                                     slow_speed=0.06):
@@ -717,7 +727,7 @@ class SudSakhonMainController(Node):
                 self.next_step(14)
             
             elif self.mission_step == 14:
-                target_x = (self.curr_x)
+                target_x = (self.curr_x) + (+0.1)
                 target_y = (self.curr_y) + (-0.8)
                 self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
                 #self.go_to(-2.40, -8.2, 180, speed_limit=0.8, pos_pid=[1.25, 0.0, 0.0], yaw_pid=yaw_pid_Set)
@@ -742,12 +752,30 @@ class SudSakhonMainController(Node):
                 #self.go_to(-1.4, -8.2, 180, speed_limit=1.0, pos_pid=[1.25, 0.0, 0.0], yaw_pid=yaw_pid_Set)
                 #self.next_step(14.3)
             elif self.mission_step == 15:
-                self.go_to(-0.2, -8.2, 180, speed_limit=1.0, pos_pid=[1.25, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+                self.go_to(-0.2, -8.2, 270, speed_limit=1.0, pos_pid=[1.25, 0.0, 0.0], yaw_pid=yaw_pid_Set)
                 self.next_step(15.1)
 
             elif self.mission_step == 15.1 and self.arrived():
-                self.go_to(-0.0, -2.0, 180, speed_limit=1.3, pos_pid=[1.35, 0.0, 0.0], yaw_pid=[80.0, 0.0, 200.0])
+                self.go_to(-0.1, -0.5, 270, speed_limit=1.35, pos_pid=[1.35, 0.0, 0.0], yaw_pid=[145.0, 0.0, 200.0])
                 self.next_step(15.2)
+
+            elif self.mission_step == 15.2 and self.arrived():   
+                self.next_step(15.3)
+                
+            elif self.mission_step == 15.3: 
+                '''
+                 print(self.Lidar_back_dist)
+                 if self.lidar_approach(self.Lidar_back_dist,
+                        direction='x-',
+                        stop_dist=0.35,
+                        slow_dist=0.40,
+                        cruise_speed=0.20,
+                        slow_speed=0.06):
+                    self.next_step(15.4)
+                '''
+            elif self.mission_step == 15.4:
+                print(f"End Program......!")
+                self.next_step(15.5)
             
             
                 #self.next_step(11.5)
@@ -795,7 +823,7 @@ class SudSakhonMainController(Node):
         marker.scale.z = 0.1
         marker.color.a = 1.0
         marker.color.g = 1.0
-        for deg in [28, -28, 0]:
+        for deg in [28, -28, 0, 180]:
             rad = np.deg2rad(deg)
             idx = int((rad - msg.angle_min) / msg.angle_increment)
             if 0 <= idx < len(msg.ranges):
@@ -804,6 +832,7 @@ class SudSakhonMainController(Node):
                     if deg ==  28: self.Lidar_left_dist   = dist
                     if deg == -28: self.Lidar_right_dist  = dist
                     if deg ==   0: self.Lidar_center_dist = dist
+                    if deg == 180: self.Lidar_back_dist   = dist
                     p = Point()
                     p.x = dist * np.cos(rad)
                     p.y = dist * np.sin(rad)
@@ -854,7 +883,10 @@ class SudSakhonMainController(Node):
         self.target_y   = y
         self.target_yaw = math.radians(yaw_deg)
         self.control_mode = "INTERNAL"
-        self.nav.set_bezier_goal(x, y, self.curr_x, self.curr_y, self.curr_yaw, curve_side=curve_side, cruise_speed=speed_limit, curve_strength=curve_strength, curve_kp = curve_kp_)
+    
+        self.get_logger().info(f"🚀 [CURVE] Go to ({x:.2f}, {y:.2f}) {yaw_deg}° @ {speed_limit}m/s")
+        #self.nav.set_bezier_goal(x, y, self.curr_x, self.curr_y, self.curr_yaw, curve_side=curve_side, cruise_speed=speed_limit, curve_strength=curve_strength, curve_kp = curve_kp_)
+        self.nav.set_bezier_goal_new(x, y, self.target_yaw, self.curr_x, self.curr_y, self.curr_yaw, curve_side=curve_side, cruise_speed=speed_limit, curve_strength=curve_strength, curve_kp = curve_kp_)
 
     def go_to_spline(self, waypoints, yaw_deg=None, speed_limit=1.0, pos_pid=None):
         if yaw_deg is None: yaw_deg = math.degrees(self.curr_yaw)
