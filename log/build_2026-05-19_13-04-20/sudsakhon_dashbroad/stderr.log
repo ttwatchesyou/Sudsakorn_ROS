@@ -1,5 +1,0 @@
-  File "/home/ubuntu/ros2_ws/install/sudsakhon_dashbroad/lib/python3.12/site-packages/sudsakhon_dashbroad/api_backend.py", line 690
-    main()──────────────────────
-          ^
-SyntaxError: invalid character '─' (U+2500)
-

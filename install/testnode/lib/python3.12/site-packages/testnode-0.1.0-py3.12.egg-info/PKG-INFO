@@ -1,7 +1,0 @@
-Metadata-Version: 2.1
-Name: testnode
-Version: 0.1.0
-Summary: ROS2 package: testnode
-Maintainer: Developer
-Maintainer-email: dev@robot.local
-License: Apache-2.0

@@ -1,0 +1,5 @@
+  File "/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/lib/python3.12/site-packages/sudsakhon_mainprogram/main_controller.py", line 296
+    self.set_pid_gains(5, ,500.0, 0.0, 25.0)
+                          ^
+SyntaxError: invalid syntax
+

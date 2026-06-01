@@ -252,9 +252,9 @@ class NavigationSystem:
     # ══════════════════════════════════════════════════════════════════════════
     def _calc_bezier(self, curr_x, curr_y, curr_yaw):
         """
-        Phase 0 CURVE : วิ่งตาม Bezier tangent + Feedback ดึงเข้าเส้น + 🔄 หมุนตัวตามโค้ง
-        Phase 1 LOCK_Y: หยุด X แก้ Y ด้วย P control
-        Phase 2 LOCK_X: หยุด Y แก้ X ด้วย P control → arrived
+        Phase 0 CURVE : วิ่งตาม Bezier tangent + Feedback ดึงเข้าเส้น (รักษาหน้าหุ่นคงที่)
+        Phase 1 LOCK_Y: ดึง Y ให้เข้าเป้า
+        Phase 2 LOCK_X: ดึง X และ Y ย้ำอีกครั้งจนเข้าเป้าเป๊ะๆ + หน่วงเวลา(Settling Time) → arrived
         """
         p2x, p2y  = self.goal_x, self.goal_y
         err_x     = p2x - curr_x
@@ -263,11 +263,19 @@ class NavigationSystem:
         dist_full = math.sqrt((p2x-self.start_x)**2 + (p2y-self.start_y)**2)
 
         TOL_ENTER    = 0.07   # m — หยุด P-control เมื่อเข้าใกล้ ก่อน advance
-        TOL_HOLD     = 0.04   # m — advance phase เมื่อ error ต่ำกว่านี้จริงๆ
+        TOL_HOLD     = 0.03   # 🌟 ปรับจาก 0.04 เป็น 0.03 เพื่อให้ระยะทแยงรวมไม่เกิน 0.05 ของ Main Controller
         MAX_SPD_LOCK = 0.35   # m/s สูงสุดขณะ lock
         MIN_CURVE_SPD = 0.05  # m/s floor ป้องกัน drift ตอน decel
 
         decel_radius = max(dist_full * self.bezier_decel_ratio, 0.30)
+
+        # -------------------------------------------------------------
+        # 🔄 รักษาหน้าหุ่น (เป้าหมายคงที่ ไม่บิดตัวตามโค้ง)
+        # -------------------------------------------------------------
+        yaw_err = self.goal_yaw - curr_yaw
+        while yaw_err >  math.pi: yaw_err -= 2.0 * math.pi
+        while yaw_err < -math.pi: yaw_err += 2.0 * math.pi
+        v_yaw = 2.0 * yaw_err 
 
         # ── Phase advance ────────────────────────────────────────────────────
         if self._bezier_phase == 0 and (dist < self._lock_gap or self._bezier_t >= 1.0):
@@ -280,6 +288,7 @@ class NavigationSystem:
         if self._bezier_phase == 1 and abs(err_y) <= TOL_HOLD:
             self._bezier_phase    = 2
             self._phase_stop_tick = True
+            self._arrive_tick     = 0   # 🌟 รีเซ็ตตัวหน่วงเวลาเมื่อเตรียมตัวหยุด
             self.node.get_logger().info(
                 f"🔒 LOCK_X triggered  err_x:{err_x:.3f}  err_y:{err_y:.3f}")
 
@@ -360,28 +369,6 @@ class NavigationSystem:
                     f"err_drift:{best_d:.3f}m  "
                     f"lx:{local_x:.2f}  ly:{local_y:.2f}")
 
-            # -------------------------------------------------------------
-            # 🔄 รักษาและหมุนหน้าหุ่น (Yaw Interpolation)
-            # -------------------------------------------------------------
-            # ป้องกัน error กรณีบางจุดลืมประกาศ start_yaw ให้ใช้ curr_yaw ไปก่อน
-            s_yaw = getattr(self, 'start_yaw', curr_yaw)
-            
-            # 1. หาระยะห่างของมุม (เป้าหมาย - เริ่มต้น)
-            diff_yaw = self.goal_yaw - s_yaw
-            while diff_yaw >  math.pi: diff_yaw -= 2.0 * math.pi
-            while diff_yaw < -math.pi: diff_yaw += 2.0 * math.pi
-            
-            # 2. คำนวณมุมเป้าหมาย ณ เสี้ยววินาทีนี้ (ตามระยะความคืบหน้า t)
-            current_target_yaw = s_yaw + (diff_yaw * t)
-            
-            # 3. คำนวณ Error เพื่อสั่งมอเตอร์หมุน
-            yaw_err = current_target_yaw - curr_yaw
-            while yaw_err >  math.pi: yaw_err -= 2.0 * math.pi
-            while yaw_err < -math.pi: yaw_err += 2.0 * math.pi
-            
-            v_yaw = 2.0 * yaw_err # (2.0 คือค่า Gain การหมุนเดิมของคุณ สามารถปรับเปลี่ยนได้)
-            # -------------------------------------------------------------
-
             cmd = Twist()
             cmd.linear.x = local_x
             cmd.linear.y = local_y
@@ -404,37 +391,57 @@ class NavigationSystem:
             cmd = Twist()
             cmd.linear.x = local_x
             cmd.linear.y = local_y
+            cmd.angular.z = v_yaw # รักษาหน้าหุ่นกันหมุนเพี้ยน
             self.node.get_logger().info(
                 f"[LOCK_Y]  err_x:{err_x:.3f}  err_y:{err_y:.3f}  spd_y:{spd_y:.3f}")
             return cmd, False
 
         # ────────────────────────────────────────────────────────────────────
-        # PHASE 2 : LOCK_X → ARRIVED
+        # PHASE 2 : LOCK_X (🌟และ Y พร้อมกัน) + ⏳ Settling Time → ARRIVED
         # ────────────────────────────────────────────────────────────────────
         if self._bezier_phase == 2:
-            if abs(err_x) <= TOL_HOLD:
-                self.is_active     = False
-                self.arrived       = True
-                self._bezier_phase = 0
-                self.node.get_logger().info(
-                    f"✅ ARRIVED  x:{curr_x:.3f}  y:{curr_y:.3f}  "
-                    f"err_x:{err_x:.3f}  err_y:{err_y:.3f}")
-                return Twist(), True
+            
+            # 🌟 เช็คว่าอยู่ในระยะหรือยัง
+            if abs(err_x) <= TOL_HOLD and abs(err_y) <= TOL_HOLD:
+                if not hasattr(self, '_arrive_tick'): self._arrive_tick = 0
+                self._arrive_tick += 1
+                
+                # ⏳ หน่วงเวลา 5 ลูป (ประมาณ 0.25 วินาที) สั่งให้รถหยุดนิ่งเพื่อความชัวร์ว่าไม่ไถล
+                if self._arrive_tick >= 5:
+                    self.is_active     = False
+                    self.arrived       = True
+                    self._bezier_phase = 0
+                    self.node.get_logger().info(
+                        f"✅ ARRIVED (SETTLED)  x:{curr_x:.3f}  y:{curr_y:.3f}  "
+                        f"err_x:{err_x:.3f}  err_y:{err_y:.3f}")
+                    return Twist(), True
+                else:
+                    # อยู่ในเป้าแล้ว แต่รอให้ชัวร์ -> สั่งเบรก (หยุดล้อ) ให้ความเร็ว x, y เป็น 0
+                    cmd = Twist()
+                    cmd.angular.z = v_yaw
+                    return cmd, False
+            else:
+                self._arrive_tick = 0 # 🌟 ถ้าไถลหลุดเป้า ให้เริ่มนับการหน่วงเวลาใหม่
 
+            # แก้อาการ X ไหล
             spd_x = err_x * 2.0
             spd_x = max(min(spd_x, MAX_SPD_LOCK), -MAX_SPD_LOCK)
 
-            local_x =  spd_x * math.cos(curr_yaw)
-            local_y = -spd_x * math.sin(curr_yaw)
+            # แก้อาการ Y ไหล
+            spd_y = err_y * 2.0
+            spd_y = max(min(spd_y, MAX_SPD_LOCK), -MAX_SPD_LOCK)
+
+            local_x =  spd_x * math.cos(curr_yaw) + spd_y * math.sin(curr_yaw)
+            local_y = -spd_x * math.sin(curr_yaw) + spd_y * math.cos(curr_yaw)
 
             cmd = Twist()
             cmd.linear.x = local_x
             cmd.linear.y = local_y
+            cmd.angular.z = v_yaw # รักษาหน้าหุ่นกันหมุนเพี้ยน
             self.node.get_logger().info(
-                f"[LOCK_X]  err_x:{err_x:.3f}  err_y:{err_y:.3f}  spd_x:{spd_x:.3f}")
+                f"[LOCK_XY] err_x:{err_x:.3f} err_y:{err_y:.3f} spd_x:{spd_x:.3f} spd_y:{spd_y:.3f}")
             return cmd, False
 
         return Twist(), False
-
     def clamp(self, val, limit):
         return max(min(val, limit), -limit)

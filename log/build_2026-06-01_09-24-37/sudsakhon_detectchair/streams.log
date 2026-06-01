@@ -1,0 +1,40 @@
+[6.438s] Invoking command in '/home/ubuntu/ros2_ws/src/sudsakhon_detectchair': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_detectchair/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_detectchair build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/install.log --single-version-externally-managed install_data
+[6.858s] running egg_info
+[6.859s] creating ../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info
+[6.882s] writing ../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info/PKG-INFO
+[6.883s] writing dependency_links to ../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info/dependency_links.txt
+[6.884s] writing entry points to ../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info/entry_points.txt
+[6.884s] writing requirements to ../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info/requires.txt
+[6.884s] writing top-level names to ../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info/top_level.txt
+[6.885s] writing manifest file '../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info/SOURCES.txt'
+[6.927s] reading manifest file '../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info/SOURCES.txt'
+[6.929s] writing manifest file '../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info/SOURCES.txt'
+[6.929s] running build
+[6.929s] running build_py
+[6.929s] creating /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/build
+[6.929s] creating /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/build/lib
+[6.929s] creating /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/build/lib/sudsakhon_detectchair
+[6.929s] copying sudsakhon_detectchair/__init__.py -> /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/build/lib/sudsakhon_detectchair
+[6.929s] copying sudsakhon_detectchair/chair_subscriber.py -> /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/build/lib/sudsakhon_detectchair
+[6.940s] copying sudsakhon_detectchair/chair_counter.py -> /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/build/lib/sudsakhon_detectchair
+[6.940s] running install
+[6.947s] running install_lib
+[6.991s] creating /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/python3.12/site-packages/sudsakhon_detectchair
+[6.992s] copying /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/build/lib/sudsakhon_detectchair/__init__.py -> /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/python3.12/site-packages/sudsakhon_detectchair
+[6.992s] copying /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/build/lib/sudsakhon_detectchair/chair_subscriber.py -> /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/python3.12/site-packages/sudsakhon_detectchair
+[6.993s] copying /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/build/lib/sudsakhon_detectchair/chair_counter.py -> /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/python3.12/site-packages/sudsakhon_detectchair
+[6.994s] byte-compiling /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/python3.12/site-packages/sudsakhon_detectchair/__init__.py to __init__.cpython-312.pyc
+[6.994s] byte-compiling /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/python3.12/site-packages/sudsakhon_detectchair/chair_subscriber.py to chair_subscriber.cpython-312.pyc
+[7.001s] byte-compiling /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/python3.12/site-packages/sudsakhon_detectchair/chair_counter.py to chair_counter.cpython-312.pyc
+[7.007s] running install_data
+[7.007s] creating /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/share/ament_index
+[7.008s] creating /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/share/ament_index/resource_index
+[7.008s] creating /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/share/ament_index/resource_index/packages
+[7.008s] copying resource/sudsakhon_detectchair -> /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/share/ament_index/resource_index/packages
+[7.009s] copying package.xml -> /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/share/sudsakhon_detectchair
+[7.009s] running install_egg_info
+[7.089s] Copying ../../build/sudsakhon_detectchair/sudsakhon_detectchair.egg-info to /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/python3.12/site-packages/sudsakhon_detectchair-0.0.0-py3.12.egg-info
+[7.091s] running install_scripts
+[7.356s] Installing subscriber script to /home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/sudsakhon_detectchair
+[7.359s] writing list of installed files to '/home/ubuntu/ros2_ws/build/sudsakhon_detectchair/install.log'
+[7.403s] Invoked command in '/home/ubuntu/ros2_ws/src/sudsakhon_detectchair' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/sudsakhon_detectchair/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/sudsakhon_detectchair/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sudsakhon_detectchair build --build-base /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/build install --record /home/ubuntu/ros2_ws/build/sudsakhon_detectchair/install.log --single-version-externally-managed install_data

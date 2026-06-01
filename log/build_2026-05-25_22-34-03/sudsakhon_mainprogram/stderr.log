@@ -1,5 +1,0 @@
-  File "/home/ubuntu/ros2_ws/install/sudsakhon_mainprogram/lib/python3.12/site-packages/sudsakhon_mainprogram/main_controller.py", line 572
-    โหมด Lidar Approach (❌ ห้ามใส่ and self.arrived() ตรงนี้เด็ดขาด)
-                         ^
-SyntaxError: invalid character '❌' (U+274C)
-
