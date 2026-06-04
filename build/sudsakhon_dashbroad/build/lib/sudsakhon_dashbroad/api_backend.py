@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Sudsakhon Bridge v5 (Modified for Servo Support & Mission Status)
+Sudsakhon Bridge v5 (Modified for Servo Support, Mission Status, & Auto-Monitor)
 Flask REST API + ROS2 node
 """
 
@@ -10,6 +10,7 @@ import os
 import json
 import subprocess
 import datetime
+import time
 
 import rclpy
 from rclpy.node import Node
@@ -34,7 +35,7 @@ app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # ─────────────────────────────────────────────────────────────────────────────
-# GLOBAL STATE
+# GLOBAL STATE & CACHE
 # ─────────────────────────────────────────────────────────────────────────────
 robot_state = {
     "linear_x": 0.0, "linear_y": 0.0, "angular_z": 0.0,
@@ -42,7 +43,7 @@ robot_state = {
     "wheels": {"fl": {"speed": 0.0}, "fr": {"speed": 0.0}, "rl": {"speed": 0.0}, "rr": {"speed": 0.0}},
     "program_color": -1,
     "program_game": 0,
-    "mission_step": 0, # 🔥 เพิ่มตัวแปรเก็บ Step ภารกิจ
+    "mission_step": 0,
     "control_states": [0, 0, 0, 0],
     "chair_count": 0,
     "monitored_services": [],
@@ -50,9 +51,11 @@ robot_state = {
     "detected_objects_log": [],
     "arduino_states": [0, 0, 0, 0],
     "arduino_sensors": {},
-    "servo_angles": {str(i): 90 for i in range(17)}
+    "servo_angles": {str(i): 90 for i in range(17)},
+    "system_ready": False # สถานะรวมว่า Service ทุกตัวพร้อมไหม
 }
 
+service_status_cache = {}
 arduino_states = [0, 0, 0, 0]
 _ros_node = None
 
@@ -69,7 +72,7 @@ def compute_wheel_speeds(vx, vy, wz):
     }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SERVICE PERSISTENCE
+# SERVICE PERSISTENCE & MONITORING
 # ─────────────────────────────────────────────────────────────────────────────
 def load_services():
     if os.path.exists(STORAGE_FILE):
@@ -89,6 +92,40 @@ def save_services():
         print(f"[bridge] save_services error: {e}")
 
 robot_state["monitored_services"] = load_services()
+
+def service_monitor_thread():
+    """Background Thread ตรวจสอบสถานะและ Auto-Restart"""
+    while True:
+        all_ready = True
+        current_time = datetime.datetime.now().strftime("%H:%M:%S")
+        
+        for svc in list(robot_state["monitored_services"]):
+            try:
+                status = subprocess.check_output(["systemctl", "is-active", svc]).decode().strip()
+            except Exception:
+                status = "inactive"
+            
+            old_info = service_status_cache.get(svc, {})
+            last_restart = old_info.get("last_restart", "-")
+            
+            if status != "active":
+                print(f"[Monitor] ⚠️ Service {svc} is down! Auto-restarting...")
+                subprocess.run(["sudo", "systemctl", "reset-failed", svc], check=False)
+                subprocess.run(["sudo", "systemctl", "restart", svc], check=False)
+                
+                status = "auto-restarting"
+                last_restart = current_time
+                all_ready = False
+            
+            service_status_cache[svc] = {
+                "name": svc,
+                "status": status,
+                "last_check": current_time,
+                "last_restart": last_restart
+            }
+
+        robot_state["system_ready"] = all_ready
+        time.sleep(5)
 
 def _node():
     if _ros_node is None:
@@ -116,7 +153,6 @@ def get_telemetry():
 def get_detected_objects():
     return jsonify({"latest": robot_state["detected_objects"], "log": robot_state["detected_objects_log"]})
 
-# 🔥 อัปเดต Endpoint นี้ให้ส่งข้อมูลครบถ้วนสำหรับหน้าเว็บ
 @app.route("/api/mission/status", methods=["GET"])
 def get_mission_status():
     raw_step = robot_state.get("mission_step", 0)
@@ -132,40 +168,16 @@ def get_mission_status():
         "team_color": "RED" if robot_state.get("program_color") == 0 else "BLUE" if robot_state.get("program_color") == 1 else "NONE",
         "program_color": robot_state.get("program_color", -1),
         "program_game": robot_state.get("program_game", 0),
-        "chair_count": robot_state.get("chair_count", 0) # <--- เพิ่มบรรทัดนี้
+        "chair_count": robot_state.get("chair_count", 0)
     })
-# @app.route("/api/mission/status", methods=["GET"])
-# def get_mission_status():
-#     raw_step = robot_state["mission_step"]
-    
-#     # กำหนดจำนวน Step ทั้งหมดของภารกิจ (อิงจากโค้ดที่คุณเพิ่งคอมเมนต์ออกเหลือ 6 สเต็ป)
-#     TOTAL_STEPS = 6 
-    
-#     # ถ้าหุ่นยนต์ส่ง Step 99 มา แปลว่าทำงานจบแล้ว เราจะจำลองให้มันเป็น Step สุดท้ายเพื่อให้เว็บมัน Reset
-#     display_step = TOTAL_STEPS if raw_step >= 99 else int(raw_step)
-    
-#     # ถ้า Step มากกว่า 0 และยังไม่ถึงจุดหมาย ให้ถือว่าหุ่นกำลังทำงาน
-#     is_running = (display_step > 0 and display_step < TOTAL_STEPS)
-    
-#     return jsonify({
-#         "mission_step": display_step,
-#         "mission_total_steps": TOTAL_STEPS,
-#         "mission_running": is_running,
-#         "team_color": "RED" if robot_state["program_color"] == 0 else "BLUE" if robot_state["program_color"] == 1 else "NONE",
-#         "program_color": robot_state["program_color"],
-#         "program_game": robot_state["program_game"]
-#     })
 
 @app.route("/api/services", methods=["GET"])
 def get_services():
-    results = []
-    for s in robot_state["monitored_services"]:
-        try:
-            status = subprocess.check_output(["systemctl", "is-active", s]).decode().strip()
-        except Exception:
-            status = "inactive"
-        results.append({"name": s, "status": status})
-    return jsonify(results)
+    results = [service_status_cache.get(s, {"name": s, "status": "unknown", "last_check": "-", "last_restart": "-"}) for s in robot_state["monitored_services"]]
+    return jsonify({
+        "services": results,
+        "system_ready": robot_state.get("system_ready", False)
+    })
 
 @app.route("/api/logs/<service_name>", methods=["GET"])
 def get_logs(service_name):
@@ -450,18 +462,14 @@ class SudsakhonBridge(Node):
         self.create_subscription(Float32, "/current_mission_step", self._mission_step_cb, 10)
         self.create_subscription(Float32, "/mission_total_steps", self._mission_step_cb, 10)
 
-        self.get_logger().info("SudsakhonBridge v5 ready (Mission Ready)")
+        self.get_logger().info("SudsakhonBridge v5 ready (Mission & Auto-Monitor Ready)")
 
-    # ── Callbacks ────────────────────────────────────────────────────────────
-    
     def _mission_step_cb(self, msg: Float32):
         robot_state["mission_step"] = msg.data
 
-    # 🔥 เพิ่มฟังก์ชัน Callback รับเก้าอี้
     def _chair_count_cb(self, msg: Int32):
         robot_state["chair_count"] = msg.data
 
-    # 🔥 เพิ่มฟังก์ชัน Callback รับเกมปัจจุบัน
     def _program_game_cb(self, msg: Int32):
         robot_state["program_game"] = msg.data
 
@@ -503,7 +511,6 @@ class SudsakhonBridge(Node):
         vals = list(msg.data)
         robot_state["arduino_sensors"] = {k: vals[i] for i, k in enumerate(keys) if i < len(vals)}
 
-    # ── Publishers ───────────────────────────────────────────────────────────
     def send_pos_pid(self, kp, ki, kd):
         msg = Float32MultiArray(); msg.data = [float(kp), float(ki), float(kd)]
         self.pub_pos_pid.publish(msg)
@@ -557,6 +564,9 @@ class SudsakhonBridge(Node):
 # ─────────────────────────────────────────────────────────────────────────────
 def main(args=None):
     global _ros_node
+
+    # เริ่มระบบ Monitor เบื้องหลัง
+    threading.Thread(target=service_monitor_thread, daemon=True).start()
 
     threading.Thread(
         target=lambda: app.run(host="0.0.0.0", port=PORT, debug=False, threaded=True, use_reloader=False),

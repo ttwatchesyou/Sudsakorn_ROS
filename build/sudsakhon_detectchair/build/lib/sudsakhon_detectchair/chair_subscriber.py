@@ -44,6 +44,11 @@ class ChairSubscriber(Node):
         # ค่าเริ่มต้น: 270 (-90) ถึง 90 องศา (ด้านหน้า)
         self.declare_parameter('filter_min_deg', 270.0) 
         self.declare_parameter('filter_max_deg', 90.0)  
+
+        #self.declare_parameter('filter_min_deg', 180.0) 
+        #self.declare_parameter('filter_max_deg', 90.0)  
+
+
         self.declare_parameter('scan_topic', '/sudsakhon_scan')
         self.declare_parameter('min_width', 0.15)    
         self.declare_parameter('max_width', 1.20)    

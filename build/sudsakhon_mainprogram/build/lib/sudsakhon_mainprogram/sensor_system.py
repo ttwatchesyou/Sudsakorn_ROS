@@ -17,7 +17,7 @@ class SensorSystem:
         self.LimitBoxBOut = 1
         self.LimitBoxBIn = 1
         self.SW_1 = 1
-        self.SW_2 = 1
+        self.Ultrasonic = 1
         self.SensorbottleL_B_UP = 1
         self.SensorbottleL_B_DW = 1
         self.SensorbottleR_B_UP = 1
@@ -35,7 +35,7 @@ class SensorSystem:
             self.LimitBoxBOut = data[2]
             self.LimitBoxBIn = data[3]
             self.SW_1 = data[4]
-            self.SW_2 = data[5]
+            self.Ultrasonic = (data[5]/100.0)
             self.SensorbottleL_B_UP = data[6]
             self.SensorbottleL_B_DW = data[7]
             self.SensorbottleR_B_UP = data[8]
