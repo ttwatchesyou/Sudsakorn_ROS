@@ -109,6 +109,45 @@ def service_monitor_thread():
             last_restart = old_info.get("last_restart", "-")
             
             if status != "active":
+                # --- ส่วนที่เพิ่มใหม่: ยกเว้นการ Auto-restart สำหรับ sudsakhon_main.service ---
+                if svc == "sudsakhon_main.service":
+                    print(f"[Monitor] ⚠️ Service {svc} is down! (Auto-restart skipped)")
+                    status = "failed (manual reset required)"
+                    all_ready = False
+                else:
+                    # Service อื่นๆ ให้ Auto-restart ตามปกติ
+                    print(f"[Monitor] ⚠️ Service {svc} is down! Auto-restarting...")
+                    subprocess.run(["sudo", "systemctl", "reset-failed", svc], check=False)
+                    subprocess.run(["sudo", "systemctl", "restart", svc], check=False)
+                    
+                    status = "auto-restarting"
+                    last_restart = current_time
+                    all_ready = False
+            
+            service_status_cache[svc] = {
+                "name": svc,
+                "status": status,
+                "last_check": current_time,
+                "last_restart": last_restart
+            }
+
+        robot_state["system_ready"] = all_ready
+        time.sleep(5)
+    """Background Thread ตรวจสอบสถานะและ Auto-Restart"""
+    while True:
+        all_ready = True
+        current_time = datetime.datetime.now().strftime("%H:%M:%S")
+        
+        for svc in list(robot_state["monitored_services"]):
+            try:
+                status = subprocess.check_output(["systemctl", "is-active", svc]).decode().strip()
+            except Exception:
+                status = "inactive"
+            
+            old_info = service_status_cache.get(svc, {})
+            last_restart = old_info.get("last_restart", "-")
+            
+            if status != "active":
                 print(f"[Monitor] ⚠️ Service {svc} is down! Auto-restarting...")
                 subprocess.run(["sudo", "systemctl", "reset-failed", svc], check=False)
                 subprocess.run(["sudo", "systemctl", "restart", svc], check=False)

@@ -14,6 +14,7 @@ sudsakhon_mainprogram/actuators.py
 sudsakhon_mainprogram/main_controller.py
 sudsakhon_mainprogram/navigation_system copy.py
 sudsakhon_mainprogram/navigation_system.py
+sudsakhon_mainprogram/robot_position.py
 sudsakhon_mainprogram/sensor_system.py
 sudsakhon_mainprogram/servo_system.py
 test/test_copyright.py

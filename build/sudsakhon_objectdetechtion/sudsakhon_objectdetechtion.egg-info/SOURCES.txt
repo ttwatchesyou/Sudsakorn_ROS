@@ -11,6 +11,7 @@ setup.py
 resource/sudsakhon_objectdetechtion
 sudsakhon_objectdetechtion/__init__.py
 sudsakhon_objectdetechtion/object_display_sub.py
+sudsakhon_objectdetechtion/yolo_depth_pub copy.py
 sudsakhon_objectdetechtion/yolo_depth_pub.py
 test/test_copyright.py
 test/test_flake8.py

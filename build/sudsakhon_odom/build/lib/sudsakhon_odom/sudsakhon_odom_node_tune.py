@@ -79,7 +79,8 @@ class RobotBridgeNode(Node):
         self.create_subscription(Twist,           '/cmd_vel',        self.vel_callback,     10)
         self.create_subscription(Pose2D,          '/cmd_goal',       self.goal_callback,    10)
         self.create_subscription(Empty,           '/cmd_reset_odom', lambda _: self.reset_odom(), 10)
-        self.create_subscription(Float32MultiArray,'/cmd_pos_pid',   self.pos_pid_callback, 10)
+        self.create_subscription(Float32MultiArray,'/cmd_pos_x_pid',   self.pos_pid_x_callback, 10)
+        self.create_subscription(Float32MultiArray,'/cmd_pos_y_pid',   self.pos_pid_y_callback, 10)
         self.create_subscription(Float32MultiArray,'/cmd_yaw_pid',   self.yaw_pid_callback, 10)
         self.create_subscription(Float32,         '/cmd_max_speed',  self.speed_limit_callback, 10)
 
@@ -141,9 +142,13 @@ class RobotBridgeNode(Node):
     def goal_callback(self, msg):
         self.send_to_robot('G', f"{msg.x}:{msg.y}:{msg.theta}")
 
-    def pos_pid_callback(self, msg):
+    def pos_pid_x_callback(self, msg):
         if len(msg.data) >= 3:
             self.send_to_robot('P', f"6:{msg.data[0]}:{msg.data[1]}:{msg.data[2]}")
+
+    def pos_pid_y_callback(self, msg):
+        if len(msg.data) >= 3:
+            self.send_to_robot('P', f"7:{msg.data[0]}:{msg.data[1]}:{msg.data[2]}")
 
     def yaw_pid_callback(self, msg):
         if len(msg.data) >= 3:

@@ -14,7 +14,7 @@ from pathlib import Path
 import rclpy
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
-from std_msgs.msg import String
+from std_msgs.msg import String, Bool
 
 import cv2
 import numpy as np
@@ -320,7 +320,17 @@ class YoloDepthPublisher(Node):
         self._declare_parameters()
         self.add_on_set_parameters_callback(self._on_set_parameters)
 
+        # Publisher
         self.publisher = self.create_publisher(String, "/detected_objects", _QOS_DEPTH)
+
+        # ─── ADDED: Subscriber for Enable/Disable YOLO ───
+        self._detection_enabled = True
+        self.enable_sub = self.create_subscription(
+            Bool, 
+            "/detected_objects_enable", 
+            self._enable_callback, 
+            10
+        )
 
         target_fps = float(self._p("target_fps"))
         period_s = max(0.001, 1.0 / target_fps) if target_fps > 0 else 0.1
@@ -367,6 +377,14 @@ class YoloDepthPublisher(Node):
         stream_port = int(self._p("stream_port"))
         start_mjpeg_server(port=stream_port)
         self.get_logger().info(f"MJPEG stream → http://0.0.0.0:{stream_port}/")
+
+    # ── callback for enable/disable ────────────────────────────────
+
+    def _enable_callback(self, msg: Bool):
+        if self._detection_enabled != msg.data:
+            self._detection_enabled = msg.data
+            state_str = "ENABLED" if self._detection_enabled else "DISABLED"
+            self.get_logger().info(f"YOLO Detection is now {state_str}")
 
     # ── parameter helpers ──────────────────────────────────────────
 
@@ -795,175 +813,192 @@ class YoloDepthPublisher(Node):
         if depth.shape[1]!=fw or depth.shape[0]!=fh:
             depth = cv2.resize(depth,(fw,fh),interpolation=cv2.INTER_NEAREST)
 
-        # YOLO inference
-        results = self.model.predict(
-            frame,
-            imgsz   = int(self._p("imgsz")),
-            conf    = float(self._p("conf")),
-            device  = str(self._p("device")),
-            half    = False,
-            classes = self.target_class_ids,
-            verbose = False,
-            max_det = int(self._p("max_det")),
-        )
+        objects = []
+        debug_lines = []
 
         box_name    = str(self._p("box_class_name")).strip().lower()
         bottle_name = str(self._p("bottle_class_name")).strip().lower()
         cl_left, cl_right = self._center_bounds(fw)
-        fallback = True  # always fallback to last known depth
 
-        dets = []
-        for r in results:
-            if r.boxes is None: continue
-            for box in r.boxes:
-                x1,y1,x2,y2 = map(int, box.xyxy[0])
-                conf_v = float(box.conf[0]) if box.conf is not None else 0.0
-                cls_id = int(box.cls[0])
-                names  = self.model.names
-                label  = names.get(cls_id,str(cls_id)) if isinstance(names,dict) else (names[cls_id] if 0<=cls_id<len(names) else str(cls_id))
-                cx = (max(0,x1)+min(fw,x2))//2
-                if not (cl_left <= cx < cl_right): continue
-                if not self._passes_filters(frame, label, conf_v, x1, y1, x2, y2): continue
+        if self._detection_enabled:
+            # ─── YOLO IS ENABLED ───
+            results = self.model.predict(
+                frame,
+                imgsz   = int(self._p("imgsz")),
+                conf    = float(self._p("conf")),
+                device  = str(self._p("device")),
+                half    = False,
+                classes = self.target_class_ids,
+                verbose = False,
+                max_det = int(self._p("max_det")),
+            )
 
-                bw_px = max(0,x2-x1); bh_px = max(0,y2-y1)
-                # Smooth bbox size
-                sk = (label.strip().lower(), cx//_STABLE_KEY_GRID_PX, (y1+y2)//2//_STABLE_KEY_GRID_PX)
-                prev_b = self._stable_bbox.get(sk)
-                if prev_b is None:
-                    self._stable_bbox[sk] = (float(bw_px), float(bh_px))
-                else:
-                    a = max(0.0,min(_BBOX_EMA_ALPHA,1.0))
-                    self._stable_bbox[sk] = (prev_b[0]*(1-a)+bw_px*a, prev_b[1]*(1-a)+bh_px*a)
-                bw_s = int(max(1, round(self._stable_bbox[sk][0])))
-                bh_s = int(max(1, round(self._stable_bbox[sk][1])))
+            dets = []
+            for r in results:
+                if r.boxes is None: continue
+                for box in r.boxes:
+                    x1,y1,x2,y2 = map(int, box.xyxy[0])
+                    conf_v = float(box.conf[0]) if box.conf is not None else 0.0
+                    cls_id = int(box.cls[0])
+                    names  = self.model.names
+                    label  = names.get(cls_id,str(cls_id)) if isinstance(names,dict) else (names[cls_id] if 0<=cls_id<len(names) else str(cls_id))
+                    cx = (max(0,x1)+min(fw,x2))//2
+                    if not (cl_left <= cx < cl_right): continue
+                    if not self._passes_filters(frame, label, conf_v, x1, y1, x2, y2): continue
 
-                dd, dq = self._estimate_depth(depth, frame, label, x1, y1, x2, y2)
-                ds     = self._size_distance_mm(label, bw_s, bh_s, fw, fh)
-                dets.append(dict(label=label,ll=label.strip().lower(),
-                                 x1=x1,y1=y1,x2=x2,y2=y2,bw=bw_s,bh=bh_s,
-                                 conf=conf_v,sk=sk,dd=dd,dq=dq,ds=ds))
-
-        # Box hold (anti-blink)
-        if not any(d["ll"]==box_name for d in dets) and self._last_box_bbox is not None:
-            age_ms = (time.monotonic()-self._last_box_time_s)*1000
-            if age_ms <= float(self._p("box_hold_ms")):
-                hx1,hy1,hx2,hy2 = [max(0,min(v,fw if i%2 else fh)) for i,v in enumerate(self._last_box_bbox)]
-                if hx2>hx1 and hy2>hy1:
-                    cx=(hx1+hx2)//2; cy=(hy1+hy2)//2
-                    if cl_left<=cx<cl_right:
-                        sk=(box_name,cx//_STABLE_KEY_GRID_PX,cy//_STABLE_KEY_GRID_PX)
-                        bw_px=hx2-hx1; bh_px=hy2-hy1
-                        dd,dq = self._estimate_depth(depth,frame,self._last_box_label or box_name,hx1,hy1,hx2,hy2)
-                        ds    = 0
-                        dets.append(dict(label=self._last_box_label or box_name, ll=box_name,
-                                         x1=hx1,y1=hy1,x2=hx2,y2=hy2,bw=bw_px,bh=bh_px,
-                                         conf=0.0,sk=sk,dd=dd,dq=dq,ds=ds,held=True))
-
-        # Bottle anchor
-        anchor_depth=0; anchor_y2=0
-        if bool(self._p("enable_bottle_anchor")):
-            b_cands=[]; b_y2s=[]
-            for d in dets:
-                if d["ll"]!=bottle_name: continue
-                dd,ds,dq=d["dd"],d["ds"],d["dq"]
-                cand=0
-                if dd>0 and ds>0:
-                    cand = ds if dd/ds<0.55 or dd/ds>1.75 else (dd if dq>=2 else ds)
-                elif dd>0 and dq>=2: cand=dd
-                elif ds>0: cand=ds
-                elif dd>0: cand=dd
-                if cand>0: b_cands.append(cand); b_y2s.append(d["y2"])
-            if b_cands:
-                anchor_depth=int(np.median(b_cands))
-                anchor_y2  =int(np.median(b_y2s))
-
-        objects=[]; debug_lines=[f"info: dets={len(dets)} anchor={anchor_depth}mm"]
-
-        for d in dets:
-            label=d["label"]; ll=d["ll"]
-            x1,y1,x2,y2=d["x1"],d["y1"],d["x2"],d["y2"]
-            bw,bh=d["bw"],d["bh"]
-            dd,dq,ds=d["dd"],d["dq"],d["ds"]
-            sk=d["sk"]
-
-            # Fuse depth + size
-            if dd<=0 or dq<=0: dist=ds
-            elif ds<=0:         dist=dd
-            else:
-                ratio=dd/ds if ds>0 else 1.0
-                oor = ratio<0.55 or ratio>1.75
-                if dq>=1:
-                    dist = (ds if ll==bottle_name and ds>0 else dd) if oor else int(0.75*dd+0.25*ds)
-                else:
-                    dist = ds if oor else int(0.75*dd+0.25*ds)
-
-            # Anchor correction
-            if anchor_depth>0 and ll==box_name:
-                ytol=int(self._p("anchor_y_tolerance_px"))
-                if anchor_y2>0 and abs(y2-anchor_y2)<=ytol:
-                    if dist>0:
-                        ratio_a = dist/anchor_depth if anchor_depth>0 else 1.0
-                        if ratio_a<_ANCHOR_RATIO_MIN or ratio_a>_ANCHOR_RATIO_MAX or abs(dist-anchor_depth)>_ANCHOR_MAX_ABS_DIFF_MM:
-                            dist=anchor_depth; dq=max(dq,2)
-                        if abs(dist-anchor_depth)>_ANCHOR_SOFT_TOL_MM:
-                            dist=anchor_depth; dq=max(dq,2)
-                        else:
-                            dist=int(round((1-_ANCHOR_BLEND_WEIGHT)*dist+_ANCHOR_BLEND_WEIGHT*anchor_depth)); dq=max(dq,2)
+                    bw_px = max(0,x2-x1); bh_px = max(0,y2-y1)
+                    # Smooth bbox size
+                    sk = (label.strip().lower(), cx//_STABLE_KEY_GRID_PX, (y1+y2)//2//_STABLE_KEY_GRID_PX)
+                    prev_b = self._stable_bbox.get(sk)
+                    if prev_b is None:
+                        self._stable_bbox[sk] = (float(bw_px), float(bh_px))
                     else:
-                        dist=anchor_depth; dq=max(dq,2)
+                        a = max(0.0,min(_BBOX_EMA_ALPHA,1.0))
+                        self._stable_bbox[sk] = (prev_b[0]*(1-a)+bw_px*a, prev_b[1]*(1-a)+bh_px*a)
+                    bw_s = int(max(1, round(self._stable_bbox[sk][0])))
+                    bh_s = int(max(1, round(self._stable_bbox[sk][1])))
 
-            # Stability filter
-            if dist>0:
-                if dq>=2: dist=int(self._stable_filter(sk,dist))
+                    dd, dq = self._estimate_depth(depth, frame, label, x1, y1, x2, y2)
+                    ds     = self._size_distance_mm(label, bw_s, bh_s, fw, fh)
+                    dets.append(dict(label=label,ll=label.strip().lower(),
+                                     x1=x1,y1=y1,x2=x2,y2=y2,bw=bw_s,bh=bh_s,
+                                     conf=conf_v,sk=sk,dd=dd,dq=dq,ds=ds))
+
+            # Box hold (anti-blink)
+            if not any(d["ll"]==box_name for d in dets) and self._last_box_bbox is not None:
+                age_ms = (time.monotonic()-self._last_box_time_s)*1000
+                if age_ms <= float(self._p("box_hold_ms")):
+                    hx1,hy1,hx2,hy2 = [max(0,min(v,fw if i%2 else fh)) for i,v in enumerate(self._last_box_bbox)]
+                    if hx2>hx1 and hy2>hy1:
+                        cx=(hx1+hx2)//2; cy=(hy1+hy2)//2
+                        if cl_left<=cx<cl_right:
+                            sk=(box_name,cx//_STABLE_KEY_GRID_PX,cy//_STABLE_KEY_GRID_PX)
+                            bw_px=hx2-hx1; bh_px=hy2-hy1
+                            dd,dq = self._estimate_depth(depth,frame,self._last_box_label or box_name,hx1,hy1,hx2,hy2)
+                            ds    = 0
+                            dets.append(dict(label=self._last_box_label or box_name, ll=box_name,
+                                             x1=hx1,y1=hy1,x2=hx2,y2=hy2,bw=bw_px,bh=bh_px,
+                                             conf=0.0,sk=sk,dd=dd,dq=dq,ds=ds,held=True))
+
+            # Bottle anchor
+            anchor_depth=0; anchor_y2=0
+            if bool(self._p("enable_bottle_anchor")):
+                b_cands=[]; b_y2s=[]
+                for d in dets:
+                    if d["ll"]!=bottle_name: continue
+                    dd,ds,dq=d["dd"],d["ds"],d["dq"]
+                    cand=0
+                    if dd>0 and ds>0:
+                        cand = ds if dd/ds<0.55 or dd/ds>1.75 else (dd if dq>=2 else ds)
+                    elif dd>0 and dq>=2: cand=dd
+                    elif ds>0: cand=ds
+                    elif dd>0: cand=dd
+                    if cand>0: b_cands.append(cand); b_y2s.append(d["y2"])
+                if b_cands:
+                    anchor_depth=int(np.median(b_cands))
+                    anchor_y2  =int(np.median(b_y2s))
+
+            debug_lines.append(f"info: dets={len(dets)} anchor={anchor_depth}mm")
+
+            for d in dets:
+                label=d["label"]; ll=d["ll"]
+                x1,y1,x2,y2=d["x1"],d["y1"],d["x2"],d["y2"]
+                bw,bh=d["bw"],d["bh"]
+                dd,dq,ds=d["dd"],d["dq"],d["ds"]
+                sk=d["sk"]
+
+                # Fuse depth + size
+                if dd<=0 or dq<=0: dist=ds
+                elif ds<=0:         dist=dd
                 else:
-                    prev=self._stable_depth.get(sk)
-                    if prev is not None: dist=int(prev)
+                    ratio=dd/ds if ds>0 else 1.0
+                    oor = ratio<0.55 or ratio>1.75
+                    if dq>=1:
+                        dist = (ds if ll==bottle_name and ds>0 else dd) if oor else int(0.75*dd+0.25*ds)
+                    else:
+                        dist = ds if oor else int(0.75*dd+0.25*ds)
 
-            if dist<=0:
-                dist=int(self._last_depth_by_key.get(sk,0))
-            if dist>0:
-                self._last_depth_by_key[sk]=dist
+                # Anchor correction
+                if anchor_depth>0 and ll==box_name:
+                    ytol=int(self._p("anchor_y_tolerance_px"))
+                    if anchor_y2>0 and abs(y2-anchor_y2)<=ytol:
+                        if dist>0:
+                            ratio_a = dist/anchor_depth if anchor_depth>0 else 1.0
+                            if ratio_a<_ANCHOR_RATIO_MIN or ratio_a>_ANCHOR_RATIO_MAX or abs(dist-anchor_depth)>_ANCHOR_MAX_ABS_DIFF_MM:
+                                dist=anchor_depth; dq=max(dq,2)
+                            if abs(dist-anchor_depth)>_ANCHOR_SOFT_TOL_MM:
+                                dist=anchor_depth; dq=max(dq,2)
+                            else:
+                                dist=int(round((1-_ANCHOR_BLEND_WEIGHT)*dist+_ANCHOR_BLEND_WEIGHT*anchor_depth)); dq=max(dq,2)
+                        else:
+                            dist=anchor_depth; dq=max(dq,2)
 
-            if dist<=0: continue
+                # Stability filter
+                if dist>0:
+                    if dq>=2: dist=int(self._stable_filter(sk,dist))
+                    else:
+                        prev=self._stable_depth.get(sk)
+                        if prev is not None: dist=int(prev)
 
-            # Compute physical size
-            hfov=math.radians(float(self._p("hfov_deg")))
-            vfov=math.radians(float(self._p("vfov_deg")))
-            obj_w=int(bw*(2*dist*np.tan(hfov/2)/fw))
-            obj_h=int(bh*(2*dist*np.tan(vfov/2)/fh))
-            dist,obj_w,obj_h=self._size_calibration(label,dist,obj_w,obj_h)
+                if dist<=0:
+                    dist=int(self._last_depth_by_key.get(sk,0))
+                if dist>0:
+                    self._last_depth_by_key[sk]=dist
 
-            objects.append(f"{label},{dist},{obj_w},{obj_h}")
-            debug_lines.append(f"det: {label}  dist={dist}mm  {obj_w}x{obj_h}mm  dq={dq}  box=({x1},{y1},{x2},{y2})")
+                if dist<=0: continue
 
-            # Draw
-            vb = self._view_bbox.get(sk)
-            a  = max(0.0,min(_VIEW_BBOX_EMA_ALPHA,1.0))
-            if vb is None:
-                self._view_bbox[sk]=(float(x1),float(y1),float(x2),float(y2))
-            else:
-                px1,py1,px2,py2=vb
-                if self._iou((x1,y1,x2,y2),(int(px1),int(py1),int(px2),int(py2)))<_VIEW_BBOX_RESET_IOU:
+                # Compute physical size
+                hfov=math.radians(float(self._p("hfov_deg")))
+                vfov=math.radians(float(self._p("vfov_deg")))
+                obj_w=int(bw*(2*dist*np.tan(hfov/2)/fw))
+                obj_h=int(bh*(2*dist*np.tan(vfov/2)/fh))
+                dist,obj_w,obj_h=self._size_calibration(label,dist,obj_w,obj_h)
+
+                objects.append(f"{label},{dist},{obj_w},{obj_h}")
+                debug_lines.append(f"det: {label}  dist={dist}mm  {obj_w}x{obj_h}mm  dq={dq}  box=({x1},{y1},{x2},{y2})")
+
+                # Draw bounding box
+                vb = self._view_bbox.get(sk)
+                a  = max(0.0,min(_VIEW_BBOX_EMA_ALPHA,1.0))
+                if vb is None:
                     self._view_bbox[sk]=(float(x1),float(y1),float(x2),float(y2))
                 else:
-                    self._view_bbox[sk]=(px1*(1-a)+x1*a, py1*(1-a)+y1*a, px2*(1-a)+x2*a, py2*(1-a)+y2*a)
-            dx1,dy1,dx2,dy2=[max(0,min(int(round(v)),fw-1 if i%2==0 else fh-1)) for i,v in enumerate(self._view_bbox[sk])]
-            dx2=max(dx1+1,min(dx2,fw)); dy2=max(dy1+1,min(dy2,fh))
-            cv2.rectangle(frame,(dx1,dy1),(dx2,dy2),(0,255,0),2)
-            txt=f"{label} {dist}mm {obj_w}x{obj_h}mm"
-            (tw,th),_=cv2.getTextSize(txt,cv2.FONT_HERSHEY_SIMPLEX,0.6,2)
-            ty=max(0,dy1-th-10)
-            cv2.rectangle(frame,(dx1,ty),(dx1+tw+8,ty+th+8),(0,255,0),-1)
-            cv2.putText(frame,txt,(dx1+4,ty+th+2),cv2.FONT_HERSHEY_SIMPLEX,0.6,(0,0,0),2)
+                    px1,py1,px2,py2=vb
+                    if self._iou((x1,y1,x2,y2),(int(px1),int(py1),int(px2),int(py2)))<_VIEW_BBOX_RESET_IOU:
+                        self._view_bbox[sk]=(float(x1),float(y1),float(x2),float(y2))
+                    else:
+                        self._view_bbox[sk]=(px1*(1-a)+x1*a, py1*(1-a)+y1*a, px2*(1-a)+x2*a, py2*(1-a)+y2*a)
+                dx1,dy1,dx2,dy2=[max(0,min(int(round(v)),fw-1 if i%2==0 else fh-1)) for i,v in enumerate(self._view_bbox[sk])]
+                dx2=max(dx1+1,min(dx2,fw)); dy2=max(dy1+1,min(dy2,fh))
+                cv2.rectangle(frame,(dx1,dy1),(dx2,dy2),(0,255,0),2)
+                txt=f"{label} {dist}mm {obj_w}x{obj_h}mm"
+                (tw,th),_=cv2.getTextSize(txt,cv2.FONT_HERSHEY_SIMPLEX,0.6,2)
+                ty=max(0,dy1-th-10)
+                cv2.rectangle(frame,(dx1,ty),(dx1+tw+8,ty+th+8),(0,255,0),-1)
+                cv2.putText(frame,txt,(dx1+4,ty+th+2),cv2.FONT_HERSHEY_SIMPLEX,0.6,(0,0,0),2)
 
-        # Center guides
-        if bool(self._p("draw_center_region_guides")) and (cl_right-cl_left)<fw:
-            cv2.line(frame,(max(0,cl_left),0),(max(0,cl_left),fh-1),(255,255,0),2)
-            cv2.line(frame,(min(fw-1,cl_right),0),(min(fw-1,cl_right),fh-1),(255,255,0),2)
+            # Publish detected objects
+            msg = String()
+            msg.data = "|".join(objects)
+            self.publisher.publish(msg)
 
-        # Publish
-        msg=String(); msg.data="|".join(objects)
-        self.publisher.publish(msg)
+        else:
+            # ─── YOLO IS DISABLED ───
+            debug_lines.append("info: Detection PAUSED by /detected_objects_enable")
+            # Draw red warning text on the camera feed
+            cv2.putText(frame, "DETECTION PAUSED", (15, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+            
+            # Publish empty string to clear any lingering UI/state on the receiving end
+            msg = String()
+            msg.data = ""
+            self.publisher.publish(msg)
+
+        if self._detection_enabled:
+
+            # Center guides (draw regardless of detection state if enabled)
+            if bool(self._p("draw_center_region_guides")) and (cl_right-cl_left)<fw:
+                cv2.line(frame,(max(0,cl_left),0),(max(0,cl_left),fh-1),(255,255,0),2)
+                cv2.line(frame,(min(fw-1,cl_right),0),(min(fw-1,cl_right),fh-1),(255,255,0),2)
 
         # Push to web stream (skip encode when no viewer)
         if _stream.client_count()>0:
