@@ -67,8 +67,8 @@ class SudSakhonMainController(Node):
         self.create_subscription(Float32MultiArray, '/ultrasonic_data',   self.ultrasonic_callback,10)
 
         # ── State ─────────────────────────────────────────────────────────────
-        self.ServoGriper_R = [115,55,80]
-        self.ServoGriper_L = [115,60,90]
+        self.ServoGriper_R = [125,45,95]
+        self.ServoGriper_L = [125,45,95]
         self.ServoBoxPusher = [90,30]
 
         self.StateControlAutomation = [0,0,0,0]
@@ -102,6 +102,10 @@ class SudSakhonMainController(Node):
         self.ChairCount_RUN = 0
         self.counterboxout  = 0
 
+        self.SensorCheckTable_L = 0
+        self.SensorCheckTable_R = 0
+        
+
         self.ProgramCommand = 0
         self.ProgramCommand_Start = 1
         self.ProgramCommand_Reset = 2
@@ -121,6 +125,8 @@ class SudSakhonMainController(Node):
         self.sensors       = SensorSystem()
         self.nav           = NavigationSystem(self)
         self.state_button  = False
+
+        self.final_result = ''
 
         self.game_seleclted = ""
         self.game_seleclted_old = "-"
@@ -231,9 +237,61 @@ class SudSakhonMainController(Node):
         out = dist < t and yaw_err < self.yaw_tolerance
         return out
 
-    
+    def align_side_with_sensors(self, side_speed=0.25):
+        """
+        ฟังก์ชันวิ่งสไลด์ข้าง (Strafe) เพื่อจัดองศาให้เซนเซอร์ซ้าย-ขวาเจอโต๊ะพร้อมกัน
+        เงื่อนไข: เจอ = 1, ไม่เจอ = 0
+        """
+        L_detect = (self.SensorCheckTable_L == 0)
+        R_detect = (self.SensorCheckTable_R == 0)
+
+
+        
+
+        # 1. ถ้าเจอทั้งคู่ (1, 1) -> ถือว่าขนานกับโต๊ะแล้ว ให้หยุดและคืนค่า True
+        if L_detect and R_detect:
+            self.control_mode = "MANUAL"
+            self.manual_vx = 0.0
+            self.manual_vy = 0.0
+            
+            stop_msg = Twist()
+            self.vel_pub.publish(stop_msg) # ส่งคำสั่งหยุดมอเตอร์ทันที
+            return True
+
+        # 2. ตรวจสอบเงื่อนไขการสไลด์ซ้าย-ขวา
+        vy = 0.0
+        if L_detect and not R_detect:
+            # เจอซ้าย แต่ไม่เจอขวา -> วิ่งสไลด์ไปทางซ้าย
+            # หมายเหตุ: ตามมาตรฐาน ROS ทิศทาง Y+ คือการวิ่งไปทางซ้าย
+            vy = side_speed  
+            
+        elif R_detect and not L_detect:
+            # เจอขวา แต่ไม่เจอซ้าย -> วิ่งสไลด์ไปทางขวา
+            # ทิศทาง Y- คือการวิ่งไปทางขวา
+            vy = -side_speed 
+            
+        else:
+            # ไม่เจอทั้งคู่ (0, 0) -> หยุดอยู่กับที่ (หรือปรับให้วิ่งชดเชยเดินหน้าถอยหลังในอนาคตได้)
+            vy = 0.0
+
+
+
+        print(f"L = '{L_detect}' : R = '{R_detect}'")
+        
+        msg = Twist()
+        msg.linear.x  = float(0.0)
+        msg.linear.y  = float(vy)
+        msg.angular.z = float(0.0) # ในลอจิกนี้มุมจะเป็น 0 หุ่นยนต์จะใช้การสไลด์แทน
+        
+        self.control_mode = "MANUAL"
+        self.manual_vx = float(0.0)
+        self.manual_vy = float(vy)
+        self.vel_pub.publish(msg)
+        
+        # คืนค่า False เพื่อบอกว่ายังจัดระเบียบไม่เสร็จ ให้ทำงานในลูปนี้ต่อไป
+        return False
     # ปรับ stop_dist เป็น 0.20 (20 cm) และ slow_dist เป็น 0.35
-    def lidar_approach(self, lidar_dist, direction='x+', stop_dist=0.20, slow_dist=0.35, cruise_speed=0.20, slow_speed=0.06, lateral_speed=0.15, lateral_detect_dist=0.80, align_kp=1.5, center_kp=25.8):
+    def lidar_approach_old(self, lidar_dist, direction='x+', stop_dist=0.20, slow_dist=0.35, cruise_speed=0.20, slow_speed=0.06, lateral_speed=0.15, lateral_detect_dist=0.80, align_kp=1.5, center_kp=25.8):
         if lidar_dist is None:
             self.set_manual_velocity(0.0, 0.0)
             return False
@@ -313,7 +371,99 @@ class SudSakhonMainController(Node):
         
         return False
 
+    # import math
+    # import numpy as np
+    # from geometry_msgs.msg import Twist
 
+    def lidar_approach(self, lidar_dist, direction='x+', stop_dist=0.20, slow_dist=0.35, cruise_speed=0.20, slow_speed=0.06, lateral_speed=0.13, lateral_detect_dist=0.80):
+        
+        # ==========================================
+        # การควบคุมความเร็วเดินหน้า (Forward Speed)
+        # ==========================================
+        if lidar_dist is None:
+            self.set_manual_velocity(0.0, 0.0)
+            return False
+
+        dir_map = {'x+': (( 1, 0), ( 0, 1)), 'x-': ((-1, 0), ( 0,-1)), 'y+': (( 0, 1), (-1, 0)), 'y-': (( 0,-1), ( 1, 0))}
+        (fdx, fdy), (ldx, ldy) = dir_map.get(direction, (( 1, 0), ( 0, 1)))
+
+        if lidar_dist <= stop_dist:
+            self.set_manual_velocity(0.0, 0.0)
+            return True
+
+        if lidar_dist <= slow_dist:
+            ratio   = (lidar_dist - stop_dist) / (slow_dist - stop_dist)
+            ratio   = max(0.0, min(1.0, ratio))
+            fwd_spd = slow_speed + (cruise_speed - slow_speed) * ratio
+        else:
+            fwd_spd = cruise_speed
+
+        # ==========================================
+        # ลอจิกการวิ่งชดเชย (Compensate / Balancing)
+        # ==========================================
+        lat_spd = 0.0
+        angular = 0.0
+        
+        # ดึงค่าระยะจาก Callback (ถ้าไม่มีให้เป็น None)
+        L = getattr(self, 'Lidar_left_dist', None)
+        R = getattr(self, 'Lidar_right_dist', None)
+
+        # ตัดระยะที่ไกลเกินกว่าที่เราสนใจทิ้งไป จะได้ไม่เอาไปคำนวณมั่ว
+        if L is not None and L > lateral_detect_dist: L = None
+        if R is not None and R > lateral_detect_dist: R = None
+
+        # กำหนดระยะความคลาดเคลื่อนที่ยอมรับได้ว่า "ตรงกันแล้ว" (เช่น ต่างกันไม่เกิน 3 cm)
+        tolerance = 0.03 
+
+        # --- ลอจิก 3 ขั้นตอนของคุณ ---
+        if L is not None and R is not None:
+            # ขั้นที่ 1: หาระยะ point ซ้าย/ขวา เปรียบเทียบกัน
+            diff = abs(L - R)
+            
+            # ขั้นที่ 3: เจอเซนเซอร์คู่ที่ใกล้เคียงกัน (ระยะต่างกันน้อยกว่า tolerance)
+            if diff <= tolerance:
+                lat_spd = 0.0  # ให้วิ่งตรงมาข้างหน้าตาม position (ไม่สไลด์)
+                
+            # ขั้นที่ 2: ให้วิ่งชดเชยไปทางตรงข้าม
+            elif L < R:
+                # ฝั่งซ้ายใกล้กว่า (หุ่นยนต์อาจเอียงขวา หรือวัตถุอยู่ซ้าย) -> ชดเชยโดยการสไลด์ขวา (-)
+                lat_spd = -lateral_speed
+            elif R < L:
+                # ฝั่งขวาใกล้กว่า -> ชดเชยโดยการสไลด์ซ้าย (+)
+                lat_spd = lateral_speed
+
+        elif L is not None and R is None:
+            # เจอระยะฝั่งซ้ายฝั่งเดียว (ซ้ายใกล้สุด) -> ชดเชยโดยการสไลด์หนีไปขวา (-)
+            lat_spd = -lateral_speed
+            
+        elif R is not None and L is None:
+            # เจอระยะฝั่งขวาฝั่งเดียว (ขวาใกล้สุด) -> ชดเชยโดยการสไลด์หนีไปซ้าย (+)
+            lat_spd = lateral_speed
+            
+        else:
+            # ถ้าไม่เจอทั้งคู่เลย (โล่ง) ให้วิ่งตรงปกติ
+            lat_spd = 0.0
+
+        # ==========================================
+        # ส่งคำสั่งควบคุม
+        # ==========================================
+        vx = fdx * fwd_spd + ldx * lat_spd
+        vy = (fdy * fwd_spd + ldy * lat_spd) *-1
+
+        print(f"vx= '{vx:.3f}' :vy= '{vy:.3f}' :angular= '{angular:.3f}' :L='{L}' :R='{R}'")
+        
+        msg = Twist()
+        msg.linear.x  = float(vx)
+        msg.linear.y  = float(vy)
+        msg.angular.z = float(angular) # ในลอจิกนี้มุมจะเป็น 0 หุ่นยนต์จะใช้การสไลด์แทน
+        
+        self.control_mode = "MANUAL"
+        self.manual_vx = float(vx)
+        self.manual_vy = float(vy)
+        self.vel_pub.publish(msg)
+        
+        return False
+    
     def single_sensor_approach(self, lidar_dist, direction='x+', stop_dist=0.50, slow_dist=0.80, cruise_speed=0.20, slow_speed=0.06):
         """
         ฟังก์ชันวิ่งเข้าหาเป้าหมายตรงๆ อิงเซนเซอร์ตัวเดียว พร้อมส่งค่าแบบ Twist
@@ -402,36 +552,47 @@ class SudSakhonMainController(Node):
 
     def Program_red_1(self):
 
-        Lidar_stop_dist = 0.14
+        Lidar_stop_dist = 0.20
         time_ungripper = 0.5
+
+        grab_x_start = -0.2
+        grab_y_start = -0.2
+
+        time_LiftUP = 10
+        time_LiftDW = 3.5
+
+        timeslideout = 0.7
+
+        Speed_Side_table = 0.2
+
 
         manager = PositionManager()
 
         curent_pos_x = self.curr_x
         curent_pos_y = self.curr_y
 
-        manager.save_position("goto-table1"     , x=-2.30 , y=-1.50 , theta=0.0 , speed_limit=1.40 , curve_strength=0.4 , curve_kp_=1.6 )
-        manager.save_position("goto-table2"     , x=-2.25 , y=-3.85 , theta=0.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.00, 0.0, 0.3] , pos_y_pid_set=[1.32, 0.0, 0.3])
-        manager.save_position("goto-table2-b"   , x=-2.3 , y=-3.90 , theta=0.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.00, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-table1"     , x=-2.25+grab_x_start , y=-1.65+grab_y_start , theta=0.0 , speed_limit=1.30 , curve_strength=0.38 , curve_kp_=1.4 )
+        manager.save_position("goto-table2"     , x=-2.30+grab_x_start , y=-4.00+grab_y_start , theta=0.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[3.00, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-table2-b"   , x=-2.3+grab_x_start , y=-3.90+grab_y_start , theta=0.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.00, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
 
-        manager.save_position("goto-table3"     , x=-2.3 , y=-3.90 , theta=180.0 , speed_limit=3.00 , yaw_pid_Set=[300.0, 500.0, 50.0], pos_x_pid_set=[1.00, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
-        manager.save_position("goto-table4"     , x=-2.3 , y=-1.70 , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[2.00, 0.0, 0.5] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-table3"     , x=-2.3+grab_x_start , y=-3.90+grab_y_start , theta=180.0 , speed_limit=3.00 , yaw_pid_Set=[300.0, 500.0, 50.0], pos_x_pid_set=[2.00, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-table4"     , x=-2.35+grab_x_start , y=-1.80+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[3.00, 0.0, 0.5] , pos_y_pid_set=[1.32, 0.0, 0.3])
 
-        manager.save_position("goto-LStep1"     , x=-2.15 , y=-4.8 , theta=180.0 , speed_limit=2.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
-        manager.save_position("goto-LStep2"     , x=-0.50 , y=-7.5 , theta=0.0   , speed_limit=1.30 , curve_strength=0.4 , curve_kp_=1.0 )
-        manager.save_position("goto-LStep3"     , x=-0.50 , y=-8.2 , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.6, 0.0, 0.3])
-        manager.save_position("goto-LStep4"     , x=-1.55 , y=-8.2 , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-LStep1"     , x=-2.3+grab_x_start , y=-4.8+grab_y_start , theta=180.0 , speed_limit=2.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-LStep2"     , x=-0.50+grab_x_start , y=-7.5+grab_y_start , theta=0.0   , speed_limit=1.30 , curve_strength=0.45 , curve_kp_=1.0 )
+        manager.save_position("goto-LStep3"     , x=-0.50+grab_x_start , y=-8.2+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.6, 0.0, 0.3])
+        manager.save_position("goto-LStep4"     , x=-1.65+grab_x_start , y=-8.2+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
 
 
-        manager.save_position("goto-M-IN-1"     , x=(curent_pos_x) + (-0.80) , y=curent_pos_y , theta=180.0 , speed_limit=0.60 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.32, 0.0, 0.3])
-        manager.save_position("goto-M-IN-2"     , x=curent_pos_x , y=(curent_pos_y) + (+0.80) , theta=180.0 , speed_limit=0.70 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.6, 0.0, 0.3])
+        manager.save_position("goto-M-IN-1"     , x=(curent_pos_x) + (-0.90) , y=curent_pos_y , theta=180.0 , speed_limit=0.60 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-M-IN-2"     , x=curent_pos_x , y=(curent_pos_y) + (+0.85) , theta=180.0 , speed_limit=0.70 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.6, 0.0, 0.3])
 
         manager.save_position("goto-M-OUT-1"    , x=(curent_pos_x) + (+0.05)  , y=curent_pos_y , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.32, 0.0, 0.3])
         manager.save_position("goto-M-OUT-2"    , x=(curent_pos_x) + (+0.9)  , y=curent_pos_y , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.2, 0.0, 0.3])
 
-        manager.save_position("goto-Home-1"     , x=-0.4 , y=-8.0 , theta=180.0 , speed_limit=1.50 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.20, 0.0, 0.1] , pos_y_pid_set=[1.25, 0.0, 0.1])
-        manager.save_position("goto-Home-2"     , x=-0.4 , y=-8.0 , theta=90.0 , speed_limit=1.00 , yaw_pid_Set=[300.0,250.0, 50.0], pos_x_pid_set=[1.35, 0.0, 0.1] , pos_y_pid_set=[1.25, 0.0, 0.1])
-        manager.save_position("goto-Home-3"     , x=-0.3 , y=-1.0 , theta=90.0 , speed_limit=3.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.25, 0.0, 0.1])
+        manager.save_position("goto-Home-1"     , x=-1.0 , y=-8.0+grab_y_start , theta=180.0 , speed_limit=1.50 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.20, 0.0, 0.1] , pos_y_pid_set=[1.25, 0.0, 0.1])
+        manager.save_position("goto-Home-2"     , x=-0.55 , y=-8.0+grab_y_start , theta=90.0 , speed_limit=1.00 , yaw_pid_Set=[300.0,250.0, 50.0], pos_x_pid_set=[1.35, 0.0, 0.1] , pos_y_pid_set=[1.25, 0.0, 0.1])
+        manager.save_position("goto-Home-3"     , x=-0.75 , y=-1.0+grab_y_start , theta=90.0 , speed_limit=3.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.25, 0.0, 0.1])
 
         #manager.show_all_positions()
 
@@ -458,7 +619,810 @@ class SudSakhonMainController(Node):
 
         elif self.mission_step == 1 and self.arrived():
             target_pos = manager.get_position("goto-table1")
+            self.go_to_curve(target_pos.x, target_pos.y,yaw_deg=target_pos.theta, speed_limit=target_pos.speed_limit, curve_strength=target_pos.curve_strength, curve_side='AUTO',curve_kp_=target_pos.curve_kp_)
+            if self.ChairCount_RUN == 1:
+                self.ControlBottle_R('down')
+                self.ControlBottle_L('up')
+                
+            else:
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('up')
+                self.Box_Pusher('active')
+            self.next_step(2)
+
+        elif self.mission_step == 2 and self.arrived(tol=0.3):
+            self.ControlBox('up')
+
+            if self.ChairCount_RUN == 1:
+                if self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0:
+                    self.play_mp3(["/home/ubuntu/Music/serve_1person.mp3"])
+                    self.Griper_R('hold')
+                    self.Griper_L('active')
+                    self.Box_Pusher('unactive')
+                    self.next_step(2.5)
+            else:
+                
+
+                if (self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0) and (self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0):
+                    self.play_mp3(["/home/ubuntu/Music/serve_2person.mp3"])
+                    self.Griper_R('active')
+                    self.Griper_L('active')
+                    self.Box_Pusher('active')
+                    
+                self.next_step(2.5)
+
+        elif self.mission_step == 2.5: 
+            
+            if self.lidar_approach(self.Lidar_center_dist, direction='x+', stop_dist=Lidar_stop_dist, slow_dist=0.45, cruise_speed=0.35, slow_speed=0.08):
+                
+                self.next_step(2.51)
+                
+        
+
+        elif self.mission_step == 2.51: 
+            if self.align_side_with_sensors(side_speed=Speed_Side_table):
+                self.next_step(2.6)
+
+        elif self.mission_step == 2.6: 
+            
+            print(f"SensorCheckBoxUp: {self.sensors.SensorCheckBoxUp}, LimitBoxBUp: {self.sensors.LimitBoxBUp}")
+            if (self.sensors.SensorCheckBoxUp == 0 or self.sensors.LimitBoxBUp == 0):
+
+                #time.sleep(0.2)
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.ControlBox('stop')
+                time.sleep(0.01)
+                self.ControlSlide('out')
+                time.sleep(timeslideout)
+                self.Box_Pusher('unactive')
+                if self.ChairCount_RUN == 1:
+                    self.Griper_R('hold')
+                    self.Griper_L('unactive')
+                else:
+                    self.Griper_R('unactive')
+                    self.Griper_L('unactive')
+                time.sleep(time_ungripper)
+
+                self.ControlSlide('in')
+                time.sleep(0.01)
+                target_pos = manager.get_position("goto-table2")
+                self.go_to(target_pos.x, target_pos.y, target_pos.theta,speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+                self.next_step(3)
+
+        elif self.mission_step == 3:
+            if(self.sensors.LimitBoxBIn == 0):
+                self.countsensor_limitbin += 1
+            if(self.countsensor_limitbin > 3):
+                
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+                self.ControlBox('up')
+
+                if self.ChairCount_RUN == 1:
+                    self.ControlBottle_R('up')
+                    self.ControlBottle_L('up')
+                    self.Box_Pusher('active')
+                    self.play_mp3(["/home/ubuntu/Music/serve_2person.mp3"])
+                else:
+                    self.ControlBottle_R('stop')
+                    self.ControlBottle_L('up')
+                    self.play_mp3(["/home/ubuntu/Music/serve_1person.mp3"])
+
+                self.next_step(4)
+
+        elif self.mission_step == 4 and self.arrived(tol=0.2):
+            self.next_step(4.5) 
+
+        elif self.mission_step == 4.5: 
+            if self.lidar_approach(self.Lidar_center_dist, direction='x+', stop_dist=Lidar_stop_dist, slow_dist=0.40, cruise_speed=0.30, slow_speed=0.1):
+                msg = Bool()
+                msg.data = True
+                self.ObjectDetech_EN_pub.publish(msg)
+                self.next_step(4.51)
+
+        elif self.mission_step == 4.51: 
+            if self.align_side_with_sensors(side_speed=Speed_Side_table):
+                self.next_step(4.6)
+        
+        elif self.mission_step == 4.6: 
+            #self.ControlBox('up')
+            if self.ChairCount_RUN == 1:
+                if (self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0) and (self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0):
+                    self.Griper_R('active')
+                    self.Griper_L('active')
+                    self.Box_Pusher('active')
+
+                    self.next_step(4.7)
+            else:
+                if (self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0):
+                    self.Griper_R('hold')
+                    self.Griper_L('active')
+                    self.Box_Pusher('unactive')
+                    
+
+                    self.next_step(4.7)
+
+        elif self.mission_step == 4.7 :
+            #time.sleep(0.2)
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            #time.sleep(0.15)
+            self.ControlSlide('out')
+            time.sleep(timeslideout)
+            self.Box_Pusher('unactive')
+            if self.ChairCount_RUN == 1:
+                self.Griper_R('unactive')
+                self.Griper_L('unactive')
+            else:
+                self.Griper_R('unactive')
+                self.Griper_L('unactive')
+            time.sleep(time_ungripper)
+            self.ControlSlide('in')
+            time.sleep(0.01)
+            target_pos = manager.get_position("goto-table2-b")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta,speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-2.15, -3.9, 0, speed_limit=2.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+
+            
+            self.next_step(5)
+
+        elif self.mission_step == 5 :
+            
+            self.next_step(5.5)
+
+        elif self.mission_step == 5.5 :
+            if self.arrived(tol=0.2):
+                self.next_step(6)
+
+        #-------------------------------------------------------------------
+
+        # 🛑 แก้ไขจุดนี้: ยกเลิก SPIN และใช้เทคนิค Shimmy แทน
+        elif self.mission_step == 6:
+            self.get_logger().info('➡️ [Step 6] ใช้เทคนิค Shimmy: ถอยออกมา 15cm พร้อมบังคับหมุน 180 องศา เพื่อปลดล็อค STM32')
+            # ถอย Y ออกมานิดนึงเป็น -3.85 (จากเดิม -4.0) เพื่อให้ระยะ X,Y ไม่เป็นศูนย์ 
+            # (สำคัญ: สังเกตว่าผมเพิ่ม yaw_pid เข้าไปด้วยเพื่อให้มั่นใจว่าบอร์ดมีแรงหมุน)
+
+            target_pos = manager.get_position("goto-table3")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, mode="DIRECT_STM32", speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            #self.go_to(-2.15, -4.0, 180.0, mode="DIRECT_STM32", speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=[300.0,500.0, 50.0])
+            self.next_step(6.4) 
+
+        elif self.mission_step == 6.4:
+            if self.arrived(tol=0.25):
+                self.get_logger().info('➡️ [Step 6.4] หมุนเสร็จแล้ว: วิ่งกลับไปเสียบจุดเดิมที่ -4.0')
+                self.detected_list = []
+                # กลับไปที่จุดเป้าหมายเดิมที่ -4.0 วางกล่อง
+                #self.go_to(-2.25, -4.0, 180.0, mode="DIRECT_STM32", speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.0], yaw_pid=[500.0, 0.0, 25.0])
+                self.next_step(6.5)
+
+        elif self.mission_step == 6.5: 
+            print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
+            # เอาข้อความที่ได้เก็บลง list
+            self.detected_list.append(self.DetectedObjects.split(',')[0] )
+            self.final_result = ''
+
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+
+            #
+            
+            if self.lidar_approach(self.Lidar_center_dist,
+                                direction='x+',
+                                stop_dist=Lidar_stop_dist,
+                                slow_dist=0.40,
+                                cruise_speed=0.30,
+                                slow_speed=0.1):
+
+                self.next_step(6.51)
+
+        elif self.mission_step == 6.51:
+            if self.align_side_with_sensors(side_speed=Speed_Side_table):
+                self.next_step(6.52)
+
+        elif self.mission_step == 6.52:
+            if len(self.detected_list) > 0:
+                total_count = len(self.detected_list)
+                threshold = total_count * 0.20  # 20% ของข้อมูลทั้งหมด
+                
+                counted_data = Counter(self.detected_list)
+                
+                # ตัดค่าว่างออกจากตัวนับเพื่อหาข้อความ (Object) ที่เยอะที่สุด
+                if '' in counted_data:
+                    del counted_data['']
+                
+                if len(counted_data) > 0:
+                    most_frequent_text = counted_data.most_common(1)[0][0]
+                    max_count = counted_data.most_common(1)[0][1]
+                    
+                    # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
+                    if max_count > threshold:
+                        self.final_result = most_frequent_text
+
+            # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+            print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
+
+            if self.final_result == 'bottle':
+                self.ControlBox('up')
+                self.objpush_table_common = "box"
+                self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                self.next_step(7.1) #ไป ลูป สั่งกล่องออก
+            elif self.final_result == 'box':
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('stop')
+                self.objpush_table_common = "bottle"
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(7.2) #ไป ลูป สั่งขวดออก
+            else:
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('stop')
+                self.objpush_table_common = "bottle"
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(7.2) #ไป ลูป สั่งขวดออก
+
+        elif self.mission_step == 7.1:
+            #self.ControlBox('up')
+            self.next_step(7.11)
+
+        elif self.mission_step == 7.11:
+            if (self.sensors.SensorCheckBoxUp == 0 or self.sensors.LimitBoxBUp == 0):
+                self.Box_Pusher('unactive')
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+
+                time.sleep(0.01)
+                self.ControlSlide('out')
+                time.sleep(timeslideout)
+                self.ControlSlide('in')
+                time.sleep(0.01)
+                self.next_step(8)
+        
+        elif self.mission_step == 7.2:
+
+            if (self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0):
+                self.Griper_R('active')
+                self.Griper_L('hold')
+                self.next_step(7.21)
+            
+        elif self.mission_step == 7.21:
+            #time.sleep(0.5)
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            time.sleep(0.1)
+            self.ControlSlide('out')
+            time.sleep(timeslideout)
+            self.Griper_R('unactive')
+            self.Griper_L('hold')
+            time.sleep(time_ungripper)
+            self.ControlSlide('in')
+            time.sleep(0.01)
+
+            self.next_step(8)
+
+        elif self.mission_step == 8:
+            target_pos = manager.get_position("goto-table4")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-2.20, -1.7, 180, speed_limit=1.0, pos_x_pid=[1.20, 0.0, 0.4], yaw_pid=yaw_pid_Set)
+            
+            self.next_step(9)
+
+        elif self.mission_step == 9:
+            if self.arrived(tol=0.2):
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.detected_list = []
+                # กลับไปที่จุดเป้าหมายเดิมที่ -4.0 วางกล่อง
+                #self.go_to(-2.25, -4.0, 180.0, mode="DIRECT_STM32", speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.0], yaw_pid=[500.0, 0.0, 25.0])
+                self.next_step(9.5)
+
+        elif self.mission_step == 9.5: 
+
+        
+            print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
+            # เอาข้อความที่ได้เก็บลง list
+            self.detected_list.append(self.DetectedObjects.split(',')[0] )
+            self.final_result = ''
+
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+            
+            if self.lidar_approach(self.Lidar_center_dist,
+                                direction='x+',
+                                stop_dist=Lidar_stop_dist ,
+                                slow_dist=0.40,
+                                cruise_speed=0.30,
+                                slow_speed=0.1):
+                self.next_step(9.51)
+
+        elif self.mission_step == 9.51:
+            if self.align_side_with_sensors(side_speed=Speed_Side_table):
+                self.next_step(9.52)
+
+        elif self.mission_step == 9.52:
+            if len(self.detected_list) > 0:
+                total_count = len(self.detected_list)
+                threshold = total_count * 0.20  # 20% ของข้อมูลทั้งหมด
+                
+                counted_data = Counter(self.detected_list)
+                
+                # ตัดค่าว่างออกจากตัวนับเพื่อหาข้อความ (Object) ที่เยอะที่สุด
+                if '' in counted_data:
+                    del counted_data['']
+                
+                if len(counted_data) > 0:
+                    most_frequent_text = counted_data.most_common(1)[0][0]
+                    max_count = counted_data.most_common(1)[0][1]
+                    
+                    # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
+                    if max_count > threshold:
+                        self.final_result = most_frequent_text
+
+            # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+            print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
+
+            if self.final_result == 'bottle':
+                self.ControlBox('up')
+                self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                self.next_step(10.1) #ไป ลูป สั่งกล่องออก
+            elif self.final_result == 'box':
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('up')
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(10.2) #ไป ลูป สั่งขวดออก
+            else:
+                if self.objpush_table_common == "bottle":
+                    self.ControlBox('up')
+                    self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                    self.next_step(10.1) #ไป ลูป สั่งกล่องออก
+                elif self.objpush_table_common == "box":
+                    self.ControlBottle_R('stop')
+                    self.ControlBottle_L('up')
+                    self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                    self.next_step(10.2) #ไป ลูป สั่งขวดออก
+
+        elif self.mission_step == 10.1:
+            #self.ControlBox('up')
+            self.next_step(10.11)
+
+        elif self.mission_step == 10.11:
+            if (self.sensors.SensorCheckBoxUp == 0 or self.sensors.LimitBoxBUp == 0):
+                self.Box_Pusher('unactive')
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+
+                time.sleep(0.15)
+                self.ControlSlide('out')
+                time.sleep(time_ungripper)
+                self.ControlSlide('in')
+                time.sleep(0.1)
+                self.next_step(11)
+    
+        elif self.mission_step == 10.2:
+            if (self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0):
+                self.Griper_R('hold')
+                self.Griper_L('active')
+                self.next_step(10.21)
+
+        elif self.mission_step == 10.21:
+            #self.Griper_R('hold')
+            #self.Griper_L('active')
+            #time.sleep(0.5)
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            time.sleep(0.1)
+            self.ControlSlide('out')
+            time.sleep(timeslideout)
+            self.Griper_R('hold')
+            self.Griper_L('unactive')
+            time.sleep(time_ungripper)
+            self.ControlSlide('in')
+            time.sleep(0.1)
+            self.next_step(11)
+
+        elif self.mission_step == 11:
+            target_pos = manager.get_position("goto-LStep1")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-2.15, -4.8, 180, speed_limit=2.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+            self.next_step(11.1)
+
+        elif self.mission_step == 11.1 and self.arrived(tol=0.4):
+            self.mission_step = 11.2
+        
+        elif self.mission_step == 11.2:
+            target_pos = manager.get_position("goto-LStep2")
             self.go_to_curve(target_pos.x, target_pos.y, speed_limit=target_pos.speed_limit, curve_strength=target_pos.curve_strength, curve_side='AUTO',curve_kp_=target_pos.curve_kp_)
+            #self.go_to_curve(-0.5, -7.5, speed_limit=1.30, curve_strength=0.45, curve_side='AUTO',curve_kp_=1.0)
+            self.mission_step = 11.21
+
+        elif self.mission_step == 11.21 and self.arrived(tol=0.3):
+            target_pos = manager.get_position("goto-LStep3")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-0.5, -8.2, 180, speed_limit=0.6, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+            self.next_step(11.3)
+
+        elif self.mission_step == 11.3 and self.arrived(tol=0.2):
+            target_pos = manager.get_position("goto-LStep4")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-1.50, -8.2, 180, speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+            self.next_step(11.4)
+        
+        elif self.mission_step == 11.4 and self.arrived(tol=0.1):
+
+            self.next_step(11.41)
+            
+        elif self.mission_step == 11.41:   
+            if self.single_sensor_approach(self.left_ultrasonic_distance, direction='y+', stop_dist=0.20, slow_dist=0.20, cruise_speed=0.20, slow_speed=0.1):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                #self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
+                #time.sleep(4.0)
+                self.next_step(11.42)
+        
+        elif self.mission_step == 11.42:   
+            if self.single_sensor_approach(self.sensors.Ultrasonic, direction='x+', stop_dist=0.30, slow_dist=0.20, cruise_speed=0.30, slow_speed=0.1):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                time.sleep(time_LiftUP)
+                #self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
+                
+                self.next_step(11.421)
+
+        elif self.mission_step == 11.421:   
+            if self.single_sensor_approach(self.right_ultrasonic_distance, direction='y-', stop_dist=0.35, slow_dist=0.10, cruise_speed=0.25, slow_speed=0.25):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                #time.sleep(3.0)
+                self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
+                
+                self.next_step(11.43)
+        
+        elif self.mission_step == 11.43 :
+
+            print(self.sensors.Ultrasonic)
+            print(f"self.sensors.Ultrasonic: '{self.sensors.Ultrasonic}'")
+
+            if self.sensors.Ultrasonic >= 1:
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที")
+                time.sleep(1.0)
+                self.next_step(12)
+        
+        elif self.mission_step == 12:
+
+            #target_x = (self.curr_x) + (-0.8)
+            #target_y = self.curr_y
+
+            #self.go_to(-2.375, -8.2, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            #self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+
+            target_pos = manager.get_position("goto-M-IN-1")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            self.next_step(12.1)
+
+        elif self.mission_step == 12.1 and self.arrived():
+
+            target_pos = manager.get_position("goto-M-IN-2")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            #target_x = (self.curr_x)
+            #target_y = (self.curr_y) + (+0.75)
+
+            #self.curent_x_lift = target_x
+            #self.curent_y_lift = target_y
+
+            #self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            #self.go_to(-2.375, -7.30, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            self.detected_list = []
+            self.next_step(12.2)
+
+        elif self.mission_step == 12.2 and self.arrived(): 
+            self.next_step(12.3)
+        
+        elif self.mission_step == 12.3:
+            print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
+            # เอาข้อความที่ได้เก็บลง list
+            self.detected_list.append(self.DetectedObjects.split(',')[0] )
+            self.final_result = ''
+
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            
+            if self.lidar_approach(self.Lidar_center_dist,
+                                direction='x+',
+                                stop_dist=Lidar_stop_dist+0.04,
+                                slow_dist=0.15,
+                                cruise_speed=0.20,
+                                slow_speed=0.10):
+
+                self.next_step(12.51)
+
+        elif self.mission_step == 12.51:
+            if self.align_side_with_sensors(side_speed=Speed_Side_table):
+                self.next_step(12.52)
+
+        elif self.mission_step == 12.52:
+
+            if len(self.detected_list) > 0:
+                total_count = len(self.detected_list)
+                threshold = total_count * 0.20  # 20% ของข้อมูลทั้งหมด
+                
+                counted_data = Counter(self.detected_list)
+                
+                # ตัดค่าว่างออกจากตัวนับเพื่อหาข้อความ (Object) ที่เยอะที่สุด
+                if '' in counted_data:
+                    del counted_data['']
+                
+                if len(counted_data) > 0:
+                    most_frequent_text = counted_data.most_common(1)[0][0]
+                    max_count = counted_data.most_common(1)[0][1]
+                    
+                    # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
+                    if max_count > threshold:
+                        self.final_result = most_frequent_text
+
+            # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+            print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
+
+            if self.final_result == 'bottle':
+                self.ControlBox('up')
+                self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                self.next_step(13.1) #ไป ลูป สั่งกล่องออก
+            elif self.final_result == 'box':
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('stop')
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(13.2) #ไป ลูป สั่งขวดออก
+            else:
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('stop')
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(13.2) #ไป ลูป สั่งขวดออก
+
+        elif self.mission_step == 13.1:
+            self.next_step(13.11)
+
+        elif self.mission_step == 13.11:
+            if (self.sensors.SensorCheckBoxUp == 0 or self.sensors.LimitBoxBUp == 0):
+                self.Box_Pusher('unactive')
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+
+                time.sleep(0.01)
+                self.ControlSlide('out')
+                time.sleep(timeslideout)
+                self.ControlSlide('in')
+                time.sleep(0.01)
+                self.next_step(14)
+    
+        elif self.mission_step == 13.2:
+            if (self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0):
+                self.Griper_R('active')
+                self.Griper_L('hold')
+                self.next_step(13.21)
+
+        elif self.mission_step == 13.21:
+            #self.Griper_R('hold')
+            #self.Griper_L('active')
+            #time.sleep(0.5)
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            time.sleep(0.01)
+            self.ControlSlide('out')
+            time.sleep(timeslideout)
+            self.Griper_R('unactive')
+            self.Griper_L('hold')
+            time.sleep(time_ungripper)
+            self.ControlSlide('in')
+            time.sleep(0.01)
+            
+            self.next_step(14)
+        
+        elif self.mission_step == 14:
+
+
+            #target_x = (self.curent_x_lift) + (+0.1)
+            #target_y = (self.curent_y_lift) + (-0.70)
+            #self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            
+
+            msg = Bool()
+            msg.data = False
+            self.ObjectDetech_EN_pub.publish(msg)
+
+
+            target_pos = manager.get_position("goto-M-OUT-1")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            self.next_step(14.01)
+
+        elif self.mission_step == 14.01:
+            if self.arrived():
+                self.next_step(14.02)
+
+        elif self.mission_step == 14.02:
+            if self.single_sensor_approach(self.left_ultrasonic_distance, direction='y+', stop_dist=0.50, slow_dist=0.40, cruise_speed=0.40, slow_speed=0.30):
+                self.next_step(14.1)
+
+        elif self.mission_step == 14.1:
+
+            #target_x = (self.curr_x) + (+0.8)
+            #target_y = self.curr_y
+            #self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            
+            target_pos = manager.get_position("goto-M-OUT-2")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            self.next_step(14.11)
+
+        elif self.mission_step == 14.11 and self.arrived(tol=0.1):
+            #self.go_to_curve(0.0, -0.3, speed_limit=0.6, curve_strength=0.4, curve_side='AUTO',curve_kp_=1.3)
+            self.next_step(14.111)
+
+        elif self.mission_step == 14.111 :   
+            if self.single_sensor_approach(self.right_ultrasonic_distance, direction='y-', stop_dist=0.15, slow_dist=0.20, cruise_speed=0.30, slow_speed=0.3):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                self.play_mp3(["/home/ubuntu/Music/liftdown.mp3"])
+                #self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
+                time.sleep(1)
+                self.next_step(14.12)
+        
+        elif self.mission_step == 14.12:   
+            if self.single_sensor_approach(self.right_ultrasonic_distance, direction='y-', stop_dist=0.15, slow_dist=0.20, cruise_speed=0.20, slow_speed=0.2):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                
+                #time.sleep(4.0)
+                self.next_step(14.2)   
+        
+        elif self.mission_step == 14.2 :
+            print(self.sensors.Ultrasonic)
+            print(f"self.sensors.Ultrasonic: '{self.sensors.Ultrasonic}'")
+
+            if self.sensors.Ultrasonic <= 1:
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที")
+                time.sleep(time_LiftDW)
+                self.next_step(15)
+            #self.go_to(-1.4, -8.2, 180, speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            #self.next_step(14.3)
+        
+
+
+        elif self.mission_step == 15:
+
+            target_pos = manager.get_position("goto-Home-1")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            #self.go_to(-0.4, -8.0, 180, speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+            self.next_step(15.05)
+        
+        elif self.mission_step == 15.05 and self.arrived(tol=0.5):
+            target_pos = manager.get_position("goto-Home-2")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-0.4, -8.0, 90, speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=[300.0,250.0, 50.0])
+            self.next_step(15.1)
+
+        elif self.mission_step == 15.1 and self.arrived(tol=0.2):
+            target_pos = manager.get_position("goto-Home-3")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-0.15, -1.0, 90, speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=[125.0, 300.0, 50.0])
+            self.next_step(15.2)
+
+        elif self.mission_step == 15.2 and self.arrived(tol=1.0):  
+            
+            self.next_step(15.3)
+            
+        elif self.mission_step == 15.3: 
+            print(f"self.sensors.Ultrasonic 1: '{self.sensors.Ultrasonic}'")
+            if self.single_sensor_approach(self.sensors.Ultrasonic, direction='x+', stop_dist=0.40, slow_dist=0.60, cruise_speed=0.40, slow_speed=0.4):
+
+                self.next_step(15.4)
+
+        elif self.mission_step == 15.4: 
+            print(f"self.sensors.Ultrasonic 2: '{self.sensors.Ultrasonic}'")
+            if self.single_sensor_approach(self.sensors.Ultrasonic, direction='x+', stop_dist=0.10, slow_dist=0.40, cruise_speed=0.30, slow_speed=0.2):
+
+                self.next_step(15.5)
+
+        elif self.mission_step == 15.5 :   
+            if self.single_sensor_approach(self.right_ultrasonic_distance, direction='y-', stop_dist=0.15, slow_dist=0.20, cruise_speed=0.20, slow_speed=0.20):
+                self.play_mp3(["/home/ubuntu/Music/finish.mp3"]) 
+                self.next_step(15.6)
+            
+        elif self.mission_step == 15.6:
+            print(f"End Program......!")
+
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+            self.Box_Pusher('unactive')
+            self.ControlBottle_R('down')
+            self.ControlBottle_L('down')
+            self.ControlBox('down')
+            #self.play_mp3(["/home/ubuntu/Music/finish.mp3"])
+            # self.play_mp3(["/home/ubuntu/Music/finish.mp3"])
+            self.next_step(150.5)
+        
+        
+            #self.next_step(11.5)
+        
+        # คำสั่งนี้อยู่นอกสุดของ if-elif block เพื่อให้อัปเดตมอเตอร์ตลอดเวลา
+
+    def Program_red_2(self):
+
+        Lidar_stop_dist = 0.20
+        time_ungripper = 0.5
+
+        grab_x_start = -0.2
+        grab_y_start = -0.2
+
+        time_LiftUP = 10
+        time_LiftDW = 6
+
+        timeslideout = 0.7
+
+
+        manager = PositionManager()
+
+        curent_pos_x = self.curr_x
+        curent_pos_y = self.curr_y
+
+        manager.save_position("goto-table1"     , x=-2.25+grab_x_start , y=-1.6+grab_y_start , theta=0.0 , speed_limit=1.30 , curve_strength=0.38 , curve_kp_=1.4 )
+        manager.save_position("goto-table2"     , x=-2.30+grab_x_start , y=-4.00+grab_y_start , theta=0.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[3.00, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-table2-b"   , x=-2.3+grab_x_start , y=-3.90+grab_y_start , theta=0.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.00, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+
+        manager.save_position("goto-table3"     , x=-2.3+grab_x_start , y=-3.90+grab_y_start , theta=180.0 , speed_limit=3.00 , yaw_pid_Set=[300.0, 500.0, 50.0], pos_x_pid_set=[2.00, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-table4"     , x=-2.35+grab_x_start , y=-1.80+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[3.00, 0.0, 0.5] , pos_y_pid_set=[1.32, 0.0, 0.3])
+
+        manager.save_position("goto-LStep1"     , x=-2.3+grab_x_start , y=-4.8+grab_y_start , theta=180.0 , speed_limit=2.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-LStep2"     , x=-0.50+grab_x_start , y=-7.5+grab_y_start , theta=0.0   , speed_limit=1.30 , curve_strength=0.45 , curve_kp_=1.0 )
+        manager.save_position("goto-LStep3"     , x=-0.50+grab_x_start , y=-8.2+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.6, 0.0, 0.3])
+        manager.save_position("goto-LStep4"     , x=-1.65+grab_x_start , y=-8.2+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+
+
+        manager.save_position("goto-M-IN-1"     , x=(curent_pos_x) + (-0.90) , y=curent_pos_y , theta=180.0 , speed_limit=0.60 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-M-IN-2"     , x=curent_pos_x , y=(curent_pos_y) + (+0.85) , theta=180.0 , speed_limit=0.70 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.6, 0.0, 0.3])
+
+        manager.save_position("goto-M-OUT-1"    , x=(curent_pos_x) + (+0.05)  , y=curent_pos_y , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-M-OUT-2"    , x=(curent_pos_x) + (+0.9)  , y=curent_pos_y , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.2, 0.0, 0.3])
+
+        manager.save_position("goto-Home-1"     , x=-1.0 , y=-8.0+grab_y_start , theta=180.0 , speed_limit=1.50 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.20, 0.0, 0.1] , pos_y_pid_set=[1.25, 0.0, 0.1])
+        manager.save_position("goto-Home-2"     , x=-0.7 , y=-8.0+grab_y_start , theta=90.0 , speed_limit=1.00 , yaw_pid_Set=[300.0,250.0, 50.0], pos_x_pid_set=[1.35, 0.0, 0.1] , pos_y_pid_set=[1.25, 0.0, 0.1])
+        manager.save_position("goto-Home-3"     , x=-0.7 , y=-1.0+grab_y_start , theta=90.0 , speed_limit=3.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.25, 0.0, 0.1])
+
+        #manager.show_all_positions()
+
+        if self.mission_step == 0:
+            if self.sensors.SW_1 == 0 or self.ProgramCommand == self.ProgramCommand_Start:
+
+                self.play_mp3(["/home/ubuntu/Music/goto_serve.mp3"])
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+                self.Box_Pusher('unactive')
+                self.ControlBottle_R('down')
+                self.ControlBottle_L('down')
+                self.ControlBox('down')
+                self.ControlSlide('in')
+                
+                self.get_logger().info('🔘 เริ่มภารกิจ!')
+                self.ChairCount_RUN = self.ChairCount
+
+                msg = Bool()
+                msg.data = False
+                self.ObjectDetech_EN_pub.publish(msg)
+
+                self.next_step(1)
+
+        elif self.mission_step == 1 and self.arrived():
+            target_pos = manager.get_position("goto-table1")
+            self.go_to_curve(target_pos.x, target_pos.y,yaw_deg=target_pos.theta, speed_limit=target_pos.speed_limit, curve_strength=target_pos.curve_strength, curve_side='AUTO',curve_kp_=target_pos.curve_kp_)
             if self.ChairCount_RUN == 1:
                 self.ControlBottle_R('down')
                 self.ControlBottle_L('up')
@@ -507,7 +1471,7 @@ class SudSakhonMainController(Node):
                 self.ControlBox('stop')
                 time.sleep(0.01)
                 self.ControlSlide('out')
-                time.sleep(0.8)
+                time.sleep(timeslideout)
                 self.Box_Pusher('unactive')
                 if self.ChairCount_RUN == 1:
                     self.Griper_R('hold')
@@ -578,7 +1542,7 @@ class SudSakhonMainController(Node):
             self.ControlBottle_L('stop')
             #time.sleep(0.15)
             self.ControlSlide('out')
-            time.sleep(0.8)
+            time.sleep(timeslideout)
             self.Box_Pusher('unactive')
             if self.ChairCount_RUN == 1:
                 self.Griper_R('unactive')
@@ -630,7 +1594,7 @@ class SudSakhonMainController(Node):
             print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
             # เอาข้อความที่ได้เก็บลง list
             self.detected_list.append(self.DetectedObjects.split(',')[0] )
-            final_result = ''
+            self.final_result = ''
 
             self.Griper_R('hold')
             self.Griper_L('hold')
@@ -663,28 +1627,29 @@ class SudSakhonMainController(Node):
                         
                         # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
                         if max_count > threshold:
-                            final_result = most_frequent_text
+                            self.final_result = most_frequent_text
 
-                # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) final_result ก็จะเป็น '' เหมือนเดิม
-                print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{final_result}'")
+                # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+                print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
 
-                if final_result == 'bottle':
+                if self.final_result == 'bottle':
                     self.ControlBox('up')
                     self.objpush_table_common = "box"
                     self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
                     self.next_step(7.1) #ไป ลูป สั่งกล่องออก
-                elif final_result == 'box':
+                elif self.final_result == 'box':
                     self.ControlBottle_R('up')
                     self.ControlBottle_L('stop')
                     self.objpush_table_common = "bottle"
                     self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
                     self.next_step(7.2) #ไป ลูป สั่งขวดออก
                 else:
-                    self.ControlBottle_R('up')
+                    self.ControlBox('up')
+                    self.ControlBottle_R('stop')
                     self.ControlBottle_L('stop')
-                    self.objpush_table_common = "bottle"
-                    self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
-                    self.next_step(7.2) #ไป ลูป สั่งขวดออก
+                    self.objpush_table_common = "box"
+                    self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                    self.next_step(7.1) #ไป ลูป สั่งขวดออก
 
         elif self.mission_step == 7.1:
             #self.ControlBox('up')
@@ -700,7 +1665,7 @@ class SudSakhonMainController(Node):
 
                 time.sleep(0.01)
                 self.ControlSlide('out')
-                time.sleep(0.8)
+                time.sleep(timeslideout)
                 self.ControlSlide('in')
                 time.sleep(0.01)
                 self.next_step(8)
@@ -718,7 +1683,7 @@ class SudSakhonMainController(Node):
             self.ControlBottle_L('stop')
             time.sleep(0.1)
             self.ControlSlide('out')
-            time.sleep(0.8)
+            time.sleep(timeslideout)
             self.Griper_R('unactive')
             self.Griper_L('hold')
             time.sleep(time_ungripper)
@@ -749,7 +1714,7 @@ class SudSakhonMainController(Node):
             print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
             # เอาข้อความที่ได้เก็บลง list
             self.detected_list.append(self.DetectedObjects.split(',')[0] )
-            final_result = ''
+            self.final_result = ''
 
             self.Griper_R('hold')
             self.Griper_L('hold')
@@ -777,16 +1742,16 @@ class SudSakhonMainController(Node):
                         
                         # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
                         if max_count > threshold:
-                            final_result = most_frequent_text
+                            self.final_result = most_frequent_text
 
-                # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) final_result ก็จะเป็น '' เหมือนเดิม
-                print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{final_result}'")
+                # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+                print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
 
-                if final_result == 'bottle':
+                if self.final_result == 'bottle':
                     self.ControlBox('up')
                     self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
                     self.next_step(10.1) #ไป ลูป สั่งกล่องออก
-                elif final_result == 'box':
+                elif self.final_result == 'box':
                     self.ControlBottle_R('stop')
                     self.ControlBottle_L('up')
                     self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
@@ -835,7 +1800,7 @@ class SudSakhonMainController(Node):
             self.ControlBottle_L('stop')
             time.sleep(0.1)
             self.ControlSlide('out')
-            time.sleep(0.8)
+            time.sleep(timeslideout)
             self.Griper_R('hold')
             self.Griper_L('unactive')
             time.sleep(time_ungripper)
@@ -882,9 +1847,9 @@ class SudSakhonMainController(Node):
                 self.next_step(11.42)
         
         elif self.mission_step == 11.42:   
-            if self.single_sensor_approach(self.sensors.Ultrasonic, direction='x+', stop_dist=0.20, slow_dist=0.20, cruise_speed=0.30, slow_speed=0.1):
+            if self.single_sensor_approach(self.sensors.Ultrasonic, direction='x+', stop_dist=0.30, slow_dist=0.20, cruise_speed=0.30, slow_speed=0.1):
                 print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
-                time.sleep(1.0)
+                time.sleep(time_LiftUP)
                 #self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
                 
                 self.next_step(11.421)
@@ -943,7 +1908,7 @@ class SudSakhonMainController(Node):
             print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
             # เอาข้อความที่ได้เก็บลง list
             self.detected_list.append(self.DetectedObjects.split(',')[0] )
-            final_result = ''
+            self.final_result = ''
 
             self.Griper_R('hold')
             self.Griper_L('hold')
@@ -953,7 +1918,7 @@ class SudSakhonMainController(Node):
             
             if self.lidar_approach(self.Lidar_center_dist,
                                 direction='x+',
-                                stop_dist=Lidar_stop_dist+0.03,
+                                stop_dist=Lidar_stop_dist+0.04,
                                 slow_dist=0.15,
                                 cruise_speed=0.20,
                                 slow_speed=0.10):
@@ -974,16 +1939,16 @@ class SudSakhonMainController(Node):
                         
                         # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
                         if max_count > threshold:
-                            final_result = most_frequent_text
+                            self.final_result = most_frequent_text
 
-                # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) final_result ก็จะเป็น '' เหมือนเดิม
-                print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{final_result}'")
+                # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+                print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
 
-                if final_result == 'bottle':
+                if self.final_result == 'bottle':
                     self.ControlBox('up')
                     self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
                     self.next_step(13.1) #ไป ลูป สั่งกล่องออก
-                elif final_result == 'box':
+                elif self.final_result == 'box':
                     self.ControlBottle_R('up')
                     self.ControlBottle_L('stop')
                     self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
@@ -1007,7 +1972,7 @@ class SudSakhonMainController(Node):
 
                 time.sleep(0.01)
                 self.ControlSlide('out')
-                time.sleep(0.8)
+                time.sleep(timeslideout)
                 self.ControlSlide('in')
                 time.sleep(0.01)
                 self.next_step(14)
@@ -1026,7 +1991,7 @@ class SudSakhonMainController(Node):
             self.ControlBottle_L('stop')
             time.sleep(0.01)
             self.ControlSlide('out')
-            time.sleep(0.8)
+            time.sleep(timeslideout)
             self.Griper_R('unactive')
             self.Griper_L('hold')
             time.sleep(time_ungripper)
@@ -1058,7 +2023,7 @@ class SudSakhonMainController(Node):
                 self.next_step(14.02)
 
         elif self.mission_step == 14.02:
-            if self.single_sensor_approach(self.left_ultrasonic_distance, direction='y+', stop_dist=0.30, slow_dist=0.40, cruise_speed=0.40, slow_speed=0.30):
+            if self.single_sensor_approach(self.left_ultrasonic_distance, direction='y+', stop_dist=0.50, slow_dist=0.40, cruise_speed=0.40, slow_speed=0.30):
                 self.next_step(14.1)
 
         elif self.mission_step == 14.1:
@@ -1077,15 +2042,15 @@ class SudSakhonMainController(Node):
             self.next_step(14.111)
 
         elif self.mission_step == 14.111 :   
-            if self.single_sensor_approach(self.right_ultrasonic_distance, direction='y-', stop_dist=0.20, slow_dist=0.20, cruise_speed=0.30, slow_speed=0.3):
+            if self.single_sensor_approach(self.right_ultrasonic_distance, direction='y-', stop_dist=0.15, slow_dist=0.20, cruise_speed=0.30, slow_speed=0.3):
                 print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
                 self.play_mp3(["/home/ubuntu/Music/liftdown.mp3"])
                 #self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
-                time.sleep(4.0)
+                time.sleep(1)
                 self.next_step(14.12)
         
         elif self.mission_step == 14.12:   
-            if self.single_sensor_approach(self.left_ultrasonic_distance, direction='y+', stop_dist=0.30, slow_dist=0.20, cruise_speed=0.30, slow_speed=0.3):
+            if self.single_sensor_approach(self.right_ultrasonic_distance, direction='y-', stop_dist=0.15, slow_dist=0.20, cruise_speed=0.20, slow_speed=0.2):
                 print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
                 
                 #time.sleep(4.0)
@@ -1097,7 +2062,7 @@ class SudSakhonMainController(Node):
 
             if self.sensors.Ultrasonic <= 1:
                 print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที")
-                time.sleep(1.0)
+                time.sleep(time_LiftDW)
                 self.next_step(15)
             #self.go_to(-1.4, -8.2, 180, speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.0], yaw_pid=yaw_pid_Set)
             #self.next_step(14.3)
@@ -1112,7 +2077,872 @@ class SudSakhonMainController(Node):
             #self.go_to(-0.4, -8.0, 180, speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
             self.next_step(15.05)
         
-        elif self.mission_step == 15.05 and self.arrived(tol=0.3):
+        elif self.mission_step == 15.05 and self.arrived(tol=0.5):
+            target_pos = manager.get_position("goto-Home-2")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-0.4, -8.0, 90, speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=[300.0,250.0, 50.0])
+            self.next_step(15.1)
+
+        elif self.mission_step == 15.1 and self.arrived(tol=0.2):
+            target_pos = manager.get_position("goto-Home-3")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-0.15, -1.0, 90, speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=[125.0, 300.0, 50.0])
+            self.next_step(15.2)
+
+        elif self.mission_step == 15.2 and self.arrived(tol=1.0):  
+            
+            self.next_step(15.3)
+            
+        elif self.mission_step == 15.3: 
+            print(f"self.sensors.Ultrasonic 1: '{self.sensors.Ultrasonic}'")
+            if self.single_sensor_approach(self.sensors.Ultrasonic, direction='x+', stop_dist=0.40, slow_dist=0.60, cruise_speed=0.40, slow_speed=0.4):
+
+                self.next_step(15.4)
+
+        elif self.mission_step == 15.4: 
+            print(f"self.sensors.Ultrasonic 2: '{self.sensors.Ultrasonic}'")
+            if self.single_sensor_approach(self.sensors.Ultrasonic, direction='x+', stop_dist=0.10, slow_dist=0.40, cruise_speed=0.30, slow_speed=0.2):
+
+                self.next_step(15.5)
+
+        elif self.mission_step == 15.5 :   
+            if self.single_sensor_approach(self.right_ultrasonic_distance, direction='y-', stop_dist=0.15, slow_dist=0.20, cruise_speed=0.20, slow_speed=0.20):
+                self.play_mp3(["/home/ubuntu/Music/finish.mp3"]) 
+                self.next_step(15.6)
+            
+        elif self.mission_step == 15.6:
+            print(f"End Program......!")
+
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+            self.Box_Pusher('unactive')
+            self.ControlBottle_R('down')
+            self.ControlBottle_L('down')
+            self.ControlBox('down')
+            #self.play_mp3(["/home/ubuntu/Music/finish.mp3"])
+            # self.play_mp3(["/home/ubuntu/Music/finish.mp3"])
+            self.next_step(150.5)
+        
+        
+            #self.next_step(11.5)
+        
+        # คำสั่งนี้อยู่นอกสุดของ if-elif block เพื่อให้อัปเดตมอเตอร์ตลอดเวลา
+
+    def Program_red_3(self):
+
+        Lidar_stop_dist = 0.1
+        time_ungripper = 0.8
+
+        grab_x_start = -0.2
+        grab_y_start = -0.2
+
+        time_LiftUP = 10
+        time_LiftDW = 3.5
+
+        timeslideout = 0.8
+
+        Speed_Side_table = 0.25
+
+
+        manager = PositionManager()
+
+        curent_pos_x = self.curr_x
+        curent_pos_y = self.curr_y
+
+        manager.save_position("goto-table1"     , x=-1.5+grab_x_start , y=-1.55+grab_y_start , theta=0.0 , speed_limit=1.00 , curve_strength=0.38 , curve_kp_=1.4 )
+        #manager.save_position("goto-table2"     , x=-1.6+grab_x_start , y=-4.00+grab_y_start , theta=0.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[3.00, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-table2-b"   , x=-1.7+grab_x_start , y=-1.55+grab_y_start , theta=0.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.00, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+
+        manager.save_position("goto-table3"     , x=-1.7+grab_x_start , y=-1.55+grab_y_start , theta=180.0 , speed_limit=3.00 , yaw_pid_Set=[300.0, 500.0, 50.0], pos_x_pid_set=[2.00, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-table4"     , x=-2.7+grab_x_start , y=-1.4+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[2.00, 0.0, 0.5] , pos_y_pid_set=[1.32, 0.0, 0.3])
+
+        # manager.save_position("goto-LStep1"     , x=-2.3+grab_x_start , y=-4.8+grab_y_start , theta=180.0 , speed_limit=2.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        # manager.save_position("goto-LStep2"     , x=-0.50+grab_x_start , y=-7.5+grab_y_start , theta=0.0   , speed_limit=1.30 , curve_strength=0.45 , curve_kp_=1.0 )
+        # manager.save_position("goto-LStep3"     , x=-0.50+grab_x_start , y=-8.2+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.6, 0.0, 0.3])
+        # manager.save_position("goto-LStep4"     , x=-1.65+grab_x_start , y=-8.2+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+
+
+        # manager.save_position("goto-M-IN-1"     , x=(curent_pos_x) + (-0.90) , y=curent_pos_y , theta=180.0 , speed_limit=0.60 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        # manager.save_position("goto-M-IN-2"     , x=curent_pos_x , y=(curent_pos_y) + (+0.85) , theta=180.0 , speed_limit=0.70 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.6, 0.0, 0.3])
+
+        # manager.save_position("goto-M-OUT-1"    , x=(curent_pos_x) + (+0.05)  , y=curent_pos_y , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        # manager.save_position("goto-M-OUT-2"    , x=(curent_pos_x) + (+0.9)  , y=curent_pos_y , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.2, 0.0, 0.3])
+
+        # manager.save_position("goto-Home-1"     , x=-1.0 , y=-8.0+grab_y_start , theta=180.0 , speed_limit=1.50 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.20, 0.0, 0.1] , pos_y_pid_set=[1.25, 0.0, 0.1])
+        # manager.save_position("goto-Home-2"     , x=-0.55 , y=-8.0+grab_y_start , theta=90.0 , speed_limit=1.00 , yaw_pid_Set=[300.0,250.0, 50.0], pos_x_pid_set=[1.35, 0.0, 0.1] , pos_y_pid_set=[1.25, 0.0, 0.1])
+        manager.save_position("goto-Home-3"     , x=0 , y=0 , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.25, 0.0, 0.1])
+        manager.save_position("goto-Home-4"     , x=0 , y=0 , theta=0.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.25, 0.0, 0.1])
+
+        #manager.show_all_positions()
+
+        if self.mission_step == 0:
+            if self.sensors.SW_1 == 0 or self.ProgramCommand == self.ProgramCommand_Start:
+
+                self.play_mp3(["/home/ubuntu/Music/goto_serve.mp3"])
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+                self.Box_Pusher('unactive')
+                self.ControlBottle_R('down')
+                self.ControlBottle_L('down')
+                self.ControlBox('down')
+                self.ControlSlide('in')
+                
+                self.get_logger().info('🔘 เริ่มภารกิจ!')
+                self.ChairCount_RUN = self.ChairCount
+
+                msg = Bool()
+                msg.data = False
+                self.ObjectDetech_EN_pub.publish(msg)
+
+                self.next_step(1)
+
+        elif self.mission_step == 1 and self.arrived():
+            target_pos = manager.get_position("goto-table1")
+            self.go_to_curve(target_pos.x, target_pos.y,yaw_deg=target_pos.theta, speed_limit=target_pos.speed_limit, curve_strength=target_pos.curve_strength, curve_side='AUTO',curve_kp_=target_pos.curve_kp_)
+            self.ControlBottle_R('up')
+            self.ControlBottle_L('down')
+            
+
+            # if self.ChairCount_RUN == 1:
+            #     self.ControlBottle_R('down')
+            #     self.ControlBottle_L('up')
+                
+            # else:
+            #     self.ControlBottle_R('up')
+            #     self.ControlBottle_L('up')
+            #     self.Box_Pusher('active')
+            
+            
+            self.next_step(2)
+
+        elif self.mission_step == 2 and self.arrived(tol=0.3):
+            self.ControlBox('up')
+            if self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0:
+                self.play_mp3(["/home/ubuntu/Music/serve_1person.mp3"])
+                self.Griper_R('active')
+                self.Griper_L('hold')
+                self.Box_Pusher('unactive')
+                self.next_step(2.5)
+
+
+            # if self.ChairCount_RUN == 1:
+            #     if self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0:
+            #         self.play_mp3(["/home/ubuntu/Music/serve_1person.mp3"])
+            #         self.Griper_R('hold')
+            #         self.Griper_L('active')
+            #         self.Box_Pusher('unactive')
+            #         self.next_step(2.5)
+            # else:
+                
+
+            #     if (self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0) and (self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0):
+            #         self.play_mp3(["/home/ubuntu/Music/serve_2person.mp3"])
+            #         self.Griper_R('active')
+            #         self.Griper_L('active')
+            #         self.Box_Pusher('active')
+                    
+            #     self.next_step(2.5)
+
+        elif self.mission_step == 2.5: 
+            
+            if self.lidar_approach(self.Lidar_center_dist, direction='x+', stop_dist=Lidar_stop_dist, slow_dist=0.45, cruise_speed=0.35, slow_speed=0.08):
+                
+                self.next_step(2.51)
+                
+        
+
+        elif self.mission_step == 2.51: 
+            if self.align_side_with_sensors(side_speed=Speed_Side_table):
+                self.next_step(2.6)
+
+        elif self.mission_step == 2.6: 
+            
+            print(f"SensorCheckBoxUp: {self.sensors.SensorCheckBoxUp}, LimitBoxBUp: {self.sensors.LimitBoxBUp}")
+            if (self.sensors.SensorCheckBoxUp == 0 or self.sensors.LimitBoxBUp == 0):
+
+                #time.sleep(0.2)
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.ControlBox('stop')
+                time.sleep(1.5)
+                self.ControlSlide('out')
+                time.sleep(timeslideout)
+                self.Box_Pusher('unactive')
+                self.Griper_R('unactive')
+                self.Griper_L('hold')
+
+                # if self.ChairCount_RUN == 1:
+                #     self.Griper_R('hold')
+                #     self.Griper_L('unactive')
+                # else:
+                #     self.Griper_R('unactive')
+                #     self.Griper_L('unactive')
+                time.sleep(time_ungripper)
+
+                self.ControlSlide('in')
+                time.sleep(1.5)
+                target_pos = manager.get_position("goto-table2-b")
+                self.go_to(target_pos.x, target_pos.y, target_pos.theta, mode="DIRECT_STM32", speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+                self.next_step(3.5)
+
+        elif self.mission_step == 3.5 :
+            
+            self.next_step(3.6)
+
+        elif self.mission_step == 3.6 :
+            if self.arrived(tol=0.2):
+                self.next_step(3.7)
+
+         #-------------------------------------------------------------------
+
+        # 🛑 แก้ไขจุดนี้: ยกเลิก SPIN และใช้เทคนิค Shimmy แทน
+        elif self.mission_step == 3.7:
+            self.get_logger().info('➡️ [Step 6] ใช้เทคนิค Shimmy: ถอยออกมา 15cm พร้อมบังคับหมุน 180 องศา เพื่อปลดล็อค STM32')
+            # ถอย Y ออกมานิดนึงเป็น -3.85 (จากเดิม -4.0) เพื่อให้ระยะ X,Y ไม่เป็นศูนย์ 
+            # (สำคัญ: สังเกตว่าผมเพิ่ม yaw_pid เข้าไปด้วยเพื่อให้มั่นใจว่าบอร์ดมีแรงหมุน)
+
+            target_pos = manager.get_position("goto-table3")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, mode="DIRECT_STM32", speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            #self.go_to(-2.15, -4.0, 180.0, mode="DIRECT_STM32", speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=[300.0,500.0, 50.0])
+            self.next_step(3.8) 
+
+        elif self.mission_step == 3.8:
+            if self.arrived(tol=0.25):
+                self.get_logger().info('➡️ [Step 6.4] หมุนเสร็จแล้ว: วิ่งกลับไปเสียบจุดเดิมที่ -4.0')
+                # self.detected_list = []
+                # กลับไปที่จุดเป้าหมายเดิมที่ -4.0 วางกล่อง
+                #self.go_to(-2.25, -4.0, 180.0, mode="DIRECT_STM32", speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.0], yaw_pid=[500.0, 0.0, 25.0])
+                target_pos = manager.get_position("goto-table4")
+                self.go_to(target_pos.x, target_pos.y, target_pos.theta, mode="DIRECT_STM32", speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+                self.next_step(3.9)
+
+        elif self.mission_step == 3.9:
+            if(self.sensors.LimitBoxBIn == 0):
+                self.countsensor_limitbin += 1
+            if(self.countsensor_limitbin > 3):
+                
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+                self.ControlBox('up')
+
+                # if self.ChairCount_RUN == 1:
+                #     self.ControlBottle_R('up')
+                #     self.ControlBottle_L('up')
+                #     self.Box_Pusher('active')
+                #     self.play_mp3(["/home/ubuntu/Music/serve_2person.mp3"])
+                # else:
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('stop')
+                self.play_mp3(["/home/ubuntu/Music/serve_1person.mp3"])
+
+                self.next_step(4)
+
+        elif self.mission_step == 4 and self.arrived(tol=0.2):
+            self.next_step(4.5) 
+
+        elif self.mission_step == 4.5: 
+            if self.lidar_approach(self.Lidar_center_dist, direction='x+', stop_dist=Lidar_stop_dist, slow_dist=0.40, cruise_speed=0.30, slow_speed=0.1):
+                msg = Bool()
+                msg.data = True
+                self.ObjectDetech_EN_pub.publish(msg)
+                self.next_step(4.51)
+
+        elif self.mission_step == 4.51: 
+            if self.align_side_with_sensors(side_speed=Speed_Side_table):
+                self.next_step(4.6)
+        
+        elif self.mission_step == 4.6: 
+            #self.ControlBox('up')
+            # if self.ChairCount_RUN == 1:
+            #     if (self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0) and (self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0):
+            #         self.Griper_R('active')
+            #         self.Griper_L('active')
+            #         self.Box_Pusher('active')
+
+            #         self.next_step(4.7)
+            # else:
+            #     if (self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0):
+            self.Griper_R('active')
+            self.Griper_L('hold')
+            self.Box_Pusher('unactive')
+            
+
+            self.next_step(4.7)
+
+        elif self.mission_step == 4.7 :
+            #time.sleep(0.2)
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            #time.sleep(0.15)
+            self.ControlSlide('out')
+            time.sleep(timeslideout)
+            self.Box_Pusher('unactive')
+            self.Griper_R('unactive')
+
+            self.Griper_L('unactive')
+            # if self.ChairCount_RUN == 1:
+            #     self.Griper_R('unactive')
+            #     self.Griper_L('unactive')
+            # else:
+            #     self.Griper_R('unactive')
+            #     self.Griper_L('unactive')
+            time.sleep(time_ungripper)
+            self.ControlSlide('in')
+            time.sleep(0.01)
+            target_pos = manager.get_position("goto-Home-3")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, mode="DIRECT_STM32", speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            self.next_step(5)
+
+        elif self.mission_step == 5 and self.arrived(tol=0.2):
+            print(f"End Program......!")
+
+            target_pos = manager.get_position("goto-Home-4")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, mode="DIRECT_STM32", speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+            self.Box_Pusher('unactive')
+            self.ControlBottle_R('down')
+            self.ControlBottle_L('down')
+            self.ControlBox('down')
+            self.play_mp3(["/home/ubuntu/Music/finish.mp3"])
+            # self.play_mp3(["/home/ubuntu/Music/finish.mp3"])
+            self.next_step(150.5)
+
+        #-------------------------------------------------------------------
+
+        # 🛑 แก้ไขจุดนี้: ยกเลิก SPIN และใช้เทคนิค Shimmy แทน
+        elif self.mission_step == 6:
+            self.get_logger().info('➡️ [Step 6] ใช้เทคนิค Shimmy: ถอยออกมา 15cm พร้อมบังคับหมุน 180 องศา เพื่อปลดล็อค STM32')
+            # ถอย Y ออกมานิดนึงเป็น -3.85 (จากเดิม -4.0) เพื่อให้ระยะ X,Y ไม่เป็นศูนย์ 
+            # (สำคัญ: สังเกตว่าผมเพิ่ม yaw_pid เข้าไปด้วยเพื่อให้มั่นใจว่าบอร์ดมีแรงหมุน)
+
+            target_pos = manager.get_position("goto-table3")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, mode="DIRECT_STM32", speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            #self.go_to(-2.15, -4.0, 180.0, mode="DIRECT_STM32", speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=[300.0,500.0, 50.0])
+            self.next_step(6.4) 
+
+        elif self.mission_step == 6.4:
+            if self.arrived(tol=0.25):
+                self.get_logger().info('➡️ [Step 6.4] หมุนเสร็จแล้ว: วิ่งกลับไปเสียบจุดเดิมที่ -4.0')
+                self.detected_list = []
+                # กลับไปที่จุดเป้าหมายเดิมที่ -4.0 วางกล่อง
+                #self.go_to(-2.25, -4.0, 180.0, mode="DIRECT_STM32", speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.0], yaw_pid=[500.0, 0.0, 25.0])
+                self.next_step(6.5)
+
+        elif self.mission_step == 6.5: 
+            print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
+            # เอาข้อความที่ได้เก็บลง list
+            self.detected_list.append(self.DetectedObjects.split(',')[0] )
+            self.final_result = ''
+
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+
+            #
+            
+            if self.lidar_approach(self.Lidar_center_dist,
+                                direction='x+',
+                                stop_dist=Lidar_stop_dist,
+                                slow_dist=0.40,
+                                cruise_speed=0.30,
+                                slow_speed=0.1):
+
+                self.next_step(6.51)
+
+        elif self.mission_step == 6.51:
+            if self.align_side_with_sensors(side_speed=Speed_Side_table):
+                self.next_step(6.52)
+
+        elif self.mission_step == 6.52:
+            if len(self.detected_list) > 0:
+                total_count = len(self.detected_list)
+                threshold = total_count * 0.20  # 20% ของข้อมูลทั้งหมด
+                
+                counted_data = Counter(self.detected_list)
+                
+                # ตัดค่าว่างออกจากตัวนับเพื่อหาข้อความ (Object) ที่เยอะที่สุด
+                if '' in counted_data:
+                    del counted_data['']
+                
+                if len(counted_data) > 0:
+                    most_frequent_text = counted_data.most_common(1)[0][0]
+                    max_count = counted_data.most_common(1)[0][1]
+                    
+                    # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
+                    if max_count > threshold:
+                        self.final_result = most_frequent_text
+
+            # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+            print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
+
+            if self.final_result == 'bottle':
+                self.ControlBox('up')
+                self.objpush_table_common = "box"
+                self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                self.next_step(7.1) #ไป ลูป สั่งกล่องออก
+            elif self.final_result == 'box':
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('stop')
+                self.objpush_table_common = "bottle"
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(7.2) #ไป ลูป สั่งขวดออก
+            else:
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('stop')
+                self.objpush_table_common = "bottle"
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(7.2) #ไป ลูป สั่งขวดออก
+
+        elif self.mission_step == 7.1:
+            #self.ControlBox('up')
+            self.next_step(7.11)
+
+        elif self.mission_step == 7.11:
+            if (self.sensors.SensorCheckBoxUp == 0 or self.sensors.LimitBoxBUp == 0):
+                self.Box_Pusher('unactive')
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+
+                time.sleep(0.01)
+                self.ControlSlide('out')
+                time.sleep(timeslideout)
+                self.ControlSlide('in')
+                time.sleep(0.01)
+                self.next_step(8)
+        
+        elif self.mission_step == 7.2:
+
+            if (self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0):
+                self.Griper_R('active')
+                self.Griper_L('hold')
+                self.next_step(7.21)
+            
+        elif self.mission_step == 7.21:
+            #time.sleep(0.5)
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            time.sleep(0.1)
+            self.ControlSlide('out')
+            time.sleep(timeslideout)
+            self.Griper_R('unactive')
+            self.Griper_L('hold')
+            time.sleep(time_ungripper)
+            self.ControlSlide('in')
+            time.sleep(0.01)
+
+            self.next_step(8)
+
+        elif self.mission_step == 8:
+            target_pos = manager.get_position("goto-table4")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-2.20, -1.7, 180, speed_limit=1.0, pos_x_pid=[1.20, 0.0, 0.4], yaw_pid=yaw_pid_Set)
+            
+            self.next_step(9)
+
+        elif self.mission_step == 9:
+            if self.arrived(tol=0.2):
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.detected_list = []
+                # กลับไปที่จุดเป้าหมายเดิมที่ -4.0 วางกล่อง
+                #self.go_to(-2.25, -4.0, 180.0, mode="DIRECT_STM32", speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.0], yaw_pid=[500.0, 0.0, 25.0])
+                self.next_step(9.5)
+
+        elif self.mission_step == 9.5: 
+
+        
+            print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
+            # เอาข้อความที่ได้เก็บลง list
+            self.detected_list.append(self.DetectedObjects.split(',')[0] )
+            self.final_result = ''
+
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+            
+            if self.lidar_approach(self.Lidar_center_dist,
+                                direction='x+',
+                                stop_dist=Lidar_stop_dist ,
+                                slow_dist=0.40,
+                                cruise_speed=0.30,
+                                slow_speed=0.1):
+                self.next_step(9.51)
+
+        elif self.mission_step == 9.51:
+            if self.align_side_with_sensors(side_speed=Speed_Side_table):
+                self.next_step(9.52)
+
+        elif self.mission_step == 9.52:
+            if len(self.detected_list) > 0:
+                total_count = len(self.detected_list)
+                threshold = total_count * 0.20  # 20% ของข้อมูลทั้งหมด
+                
+                counted_data = Counter(self.detected_list)
+                
+                # ตัดค่าว่างออกจากตัวนับเพื่อหาข้อความ (Object) ที่เยอะที่สุด
+                if '' in counted_data:
+                    del counted_data['']
+                
+                if len(counted_data) > 0:
+                    most_frequent_text = counted_data.most_common(1)[0][0]
+                    max_count = counted_data.most_common(1)[0][1]
+                    
+                    # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
+                    if max_count > threshold:
+                        self.final_result = most_frequent_text
+
+            # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+            print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
+
+            if self.final_result == 'bottle':
+                self.ControlBox('up')
+                self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                self.next_step(10.1) #ไป ลูป สั่งกล่องออก
+            elif self.final_result == 'box':
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('up')
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(10.2) #ไป ลูป สั่งขวดออก
+            else:
+                if self.objpush_table_common == "bottle":
+                    self.ControlBox('up')
+                    self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                    self.next_step(10.1) #ไป ลูป สั่งกล่องออก
+                elif self.objpush_table_common == "box":
+                    self.ControlBottle_R('stop')
+                    self.ControlBottle_L('up')
+                    self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                    self.next_step(10.2) #ไป ลูป สั่งขวดออก
+
+        elif self.mission_step == 10.1:
+            #self.ControlBox('up')
+            self.next_step(10.11)
+
+        elif self.mission_step == 10.11:
+            if (self.sensors.SensorCheckBoxUp == 0 or self.sensors.LimitBoxBUp == 0):
+                self.Box_Pusher('unactive')
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+
+                time.sleep(0.15)
+                self.ControlSlide('out')
+                time.sleep(time_ungripper)
+                self.ControlSlide('in')
+                time.sleep(0.1)
+                self.next_step(11)
+    
+        elif self.mission_step == 10.2:
+            if (self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0):
+                self.Griper_R('hold')
+                self.Griper_L('active')
+                self.next_step(10.21)
+
+        elif self.mission_step == 10.21:
+            #self.Griper_R('hold')
+            #self.Griper_L('active')
+            #time.sleep(0.5)
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            time.sleep(0.1)
+            self.ControlSlide('out')
+            time.sleep(timeslideout)
+            self.Griper_R('hold')
+            self.Griper_L('unactive')
+            time.sleep(time_ungripper)
+            self.ControlSlide('in')
+            time.sleep(0.1)
+            self.next_step(11)
+
+        elif self.mission_step == 11:
+            target_pos = manager.get_position("goto-LStep1")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-2.15, -4.8, 180, speed_limit=2.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+            self.next_step(11.1)
+
+        elif self.mission_step == 11.1 and self.arrived(tol=0.4):
+            self.mission_step = 11.2
+        
+        elif self.mission_step == 11.2:
+            target_pos = manager.get_position("goto-LStep2")
+            self.go_to_curve(target_pos.x, target_pos.y, speed_limit=target_pos.speed_limit, curve_strength=target_pos.curve_strength, curve_side='AUTO',curve_kp_=target_pos.curve_kp_)
+            #self.go_to_curve(-0.5, -7.5, speed_limit=1.30, curve_strength=0.45, curve_side='AUTO',curve_kp_=1.0)
+            self.mission_step = 11.21
+
+        elif self.mission_step == 11.21 and self.arrived(tol=0.3):
+            target_pos = manager.get_position("goto-LStep3")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-0.5, -8.2, 180, speed_limit=0.6, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+            self.next_step(11.3)
+
+        elif self.mission_step == 11.3 and self.arrived(tol=0.2):
+            target_pos = manager.get_position("goto-LStep4")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-1.50, -8.2, 180, speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+            self.next_step(11.4)
+        
+        elif self.mission_step == 11.4 and self.arrived(tol=0.1):
+
+            self.next_step(11.41)
+            
+        elif self.mission_step == 11.41:   
+            if self.single_sensor_approach(self.left_ultrasonic_distance, direction='y+', stop_dist=0.20, slow_dist=0.20, cruise_speed=0.20, slow_speed=0.1):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                #self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
+                #time.sleep(4.0)
+                self.next_step(11.42)
+        
+        elif self.mission_step == 11.42:   
+            if self.single_sensor_approach(self.sensors.Ultrasonic, direction='x+', stop_dist=0.30, slow_dist=0.20, cruise_speed=0.30, slow_speed=0.1):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                time.sleep(time_LiftUP)
+                #self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
+                
+                self.next_step(11.421)
+
+        elif self.mission_step == 11.421:   
+            if self.single_sensor_approach(self.right_ultrasonic_distance, direction='y-', stop_dist=0.35, slow_dist=0.10, cruise_speed=0.25, slow_speed=0.25):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                #time.sleep(3.0)
+                self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
+                
+                self.next_step(11.43)
+        
+        elif self.mission_step == 11.43 :
+
+            print(self.sensors.Ultrasonic)
+            print(f"self.sensors.Ultrasonic: '{self.sensors.Ultrasonic}'")
+
+            if self.sensors.Ultrasonic >= 1:
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที")
+                time.sleep(1.0)
+                self.next_step(12)
+        
+        elif self.mission_step == 12:
+
+            #target_x = (self.curr_x) + (-0.8)
+            #target_y = self.curr_y
+
+            #self.go_to(-2.375, -8.2, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            #self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+
+            target_pos = manager.get_position("goto-M-IN-1")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            self.next_step(12.1)
+
+        elif self.mission_step == 12.1 and self.arrived():
+
+            target_pos = manager.get_position("goto-M-IN-2")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            #target_x = (self.curr_x)
+            #target_y = (self.curr_y) + (+0.75)
+
+            #self.curent_x_lift = target_x
+            #self.curent_y_lift = target_y
+
+            #self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            #self.go_to(-2.375, -7.30, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            self.detected_list = []
+            self.next_step(12.2)
+
+        elif self.mission_step == 12.2 and self.arrived(): 
+            self.next_step(12.3)
+        
+        elif self.mission_step == 12.3:
+            print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
+            # เอาข้อความที่ได้เก็บลง list
+            self.detected_list.append(self.DetectedObjects.split(',')[0] )
+            self.final_result = ''
+
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            
+            if self.lidar_approach(self.Lidar_center_dist,
+                                direction='x+',
+                                stop_dist=Lidar_stop_dist+0.04,
+                                slow_dist=0.15,
+                                cruise_speed=0.20,
+                                slow_speed=0.10):
+
+                self.next_step(12.51)
+
+        elif self.mission_step == 12.51:
+            if self.align_side_with_sensors(side_speed=Speed_Side_table):
+                self.next_step(12.52)
+
+        elif self.mission_step == 12.52:
+
+            if len(self.detected_list) > 0:
+                total_count = len(self.detected_list)
+                threshold = total_count * 0.20  # 20% ของข้อมูลทั้งหมด
+                
+                counted_data = Counter(self.detected_list)
+                
+                # ตัดค่าว่างออกจากตัวนับเพื่อหาข้อความ (Object) ที่เยอะที่สุด
+                if '' in counted_data:
+                    del counted_data['']
+                
+                if len(counted_data) > 0:
+                    most_frequent_text = counted_data.most_common(1)[0][0]
+                    max_count = counted_data.most_common(1)[0][1]
+                    
+                    # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
+                    if max_count > threshold:
+                        self.final_result = most_frequent_text
+
+            # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+            print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
+
+            if self.final_result == 'bottle':
+                self.ControlBox('up')
+                self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                self.next_step(13.1) #ไป ลูป สั่งกล่องออก
+            elif self.final_result == 'box':
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('stop')
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(13.2) #ไป ลูป สั่งขวดออก
+            else:
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('stop')
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(13.2) #ไป ลูป สั่งขวดออก
+
+        elif self.mission_step == 13.1:
+            self.next_step(13.11)
+
+        elif self.mission_step == 13.11:
+            if (self.sensors.SensorCheckBoxUp == 0 or self.sensors.LimitBoxBUp == 0):
+                self.Box_Pusher('unactive')
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+
+                time.sleep(0.01)
+                self.ControlSlide('out')
+                time.sleep(timeslideout)
+                self.ControlSlide('in')
+                time.sleep(0.01)
+                self.next_step(14)
+    
+        elif self.mission_step == 13.2:
+            if (self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0):
+                self.Griper_R('active')
+                self.Griper_L('hold')
+                self.next_step(13.21)
+
+        elif self.mission_step == 13.21:
+            #self.Griper_R('hold')
+            #self.Griper_L('active')
+            #time.sleep(0.5)
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            time.sleep(0.01)
+            self.ControlSlide('out')
+            time.sleep(timeslideout)
+            self.Griper_R('unactive')
+            self.Griper_L('hold')
+            time.sleep(time_ungripper)
+            self.ControlSlide('in')
+            time.sleep(0.01)
+            
+            self.next_step(14)
+        
+        elif self.mission_step == 14:
+
+
+            #target_x = (self.curent_x_lift) + (+0.1)
+            #target_y = (self.curent_y_lift) + (-0.70)
+            #self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            
+
+            msg = Bool()
+            msg.data = False
+            self.ObjectDetech_EN_pub.publish(msg)
+
+
+            target_pos = manager.get_position("goto-M-OUT-1")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            self.next_step(14.01)
+
+        elif self.mission_step == 14.01:
+            if self.arrived():
+                self.next_step(14.02)
+
+        elif self.mission_step == 14.02:
+            if self.single_sensor_approach(self.left_ultrasonic_distance, direction='y+', stop_dist=0.50, slow_dist=0.40, cruise_speed=0.40, slow_speed=0.30):
+                self.next_step(14.1)
+
+        elif self.mission_step == 14.1:
+
+            #target_x = (self.curr_x) + (+0.8)
+            #target_y = self.curr_y
+            #self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            
+            target_pos = manager.get_position("goto-M-OUT-2")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            self.next_step(14.11)
+
+        elif self.mission_step == 14.11 and self.arrived(tol=0.1):
+            #self.go_to_curve(0.0, -0.3, speed_limit=0.6, curve_strength=0.4, curve_side='AUTO',curve_kp_=1.3)
+            self.next_step(14.111)
+
+        elif self.mission_step == 14.111 :   
+            if self.single_sensor_approach(self.right_ultrasonic_distance, direction='y-', stop_dist=0.15, slow_dist=0.20, cruise_speed=0.30, slow_speed=0.3):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                self.play_mp3(["/home/ubuntu/Music/liftdown.mp3"])
+                #self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
+                time.sleep(1)
+                self.next_step(14.12)
+        
+        elif self.mission_step == 14.12:   
+            if self.single_sensor_approach(self.right_ultrasonic_distance, direction='y-', stop_dist=0.15, slow_dist=0.20, cruise_speed=0.20, slow_speed=0.2):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                
+                #time.sleep(4.0)
+                self.next_step(14.2)   
+        
+        elif self.mission_step == 14.2 :
+            print(self.sensors.Ultrasonic)
+            print(f"self.sensors.Ultrasonic: '{self.sensors.Ultrasonic}'")
+
+            if self.sensors.Ultrasonic <= 1:
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที")
+                time.sleep(time_LiftDW)
+                self.next_step(15)
+            #self.go_to(-1.4, -8.2, 180, speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            #self.next_step(14.3)
+        
+
+
+        elif self.mission_step == 15:
+
+            target_pos = manager.get_position("goto-Home-1")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            #self.go_to(-0.4, -8.0, 180, speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+            self.next_step(15.05)
+        
+        elif self.mission_step == 15.05 and self.arrived(tol=0.5):
             target_pos = manager.get_position("goto-Home-2")
             self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
             #self.go_to(-0.4, -8.0, 90, speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=[300.0,250.0, 50.0])
@@ -1165,25 +2995,34 @@ class SudSakhonMainController(Node):
 
     def Program_blue_1(self):
 
-        Lidar_stop_dist = 0.12
+        Lidar_stop_dist = 0.20
         time_ungripper = 0.5
+
+        time_LiftUP = 8
+        time_LiftDW = 8
+
+        grab_x_start = -0.2
+        grab_y_start = 0.2
+
+        time_out = 0.7
+
 
         manager = PositionManager()
 
         curent_pos_x = self.curr_x
         curent_pos_y = self.curr_y
 
-        manager.save_position("goto-table1"     , x=-2.30 , y=1.60 , theta=0.0 , speed_limit=1.30 , curve_strength=0.4 , curve_kp_=1.3 )
-        manager.save_position("goto-table2"     , x=-2.15 , y=3.85 , theta=0.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[2.00, 0.0, 0.3] , pos_y_pid_set=[1.32, 0.0, 0.3])
-        manager.save_position("goto-table2-b"   , x=-2.20 , y=3.90 , theta=0.0 , speed_limit=2.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-table1"     , x=-2.15+grab_x_start , y=1.16+grab_y_start , theta=0.0 , speed_limit=1.30 , curve_strength=0.4 , curve_kp_=1.4 )
+        manager.save_position("goto-table2"     , x=-2.15+grab_x_start , y=3.80+grab_y_start , theta=0.0 , speed_limit=1.00 , yaw_pid_Set=[120.0, 300.0, 50.0], pos_x_pid_set=[2.00, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-table2-b"   , x=-2.20+grab_x_start , y=3.80+grab_y_start , theta=0.0 , speed_limit=2.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
 
-        manager.save_position("goto-table3"     , x=-2.20 , y=4.10 , theta=180.0 , speed_limit=3.00 , yaw_pid_Set=[300.0, 500.0, 50.0], pos_x_pid_set=[2.00, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
-        manager.save_position("goto-table4"     , x=-2.15 , y=2.00 , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[2.00, 0.0, 0.4] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-table3"     , x=-2.22+grab_x_start , y=3.80+grab_y_start , theta=180.0 , speed_limit=3.00 , yaw_pid_Set=[300.0, 500.0, 50.0], pos_x_pid_set=[2.00, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-table4"     , x=-2.20+grab_x_start , y=1.78+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[2.00, 0.0, 0.4] , pos_y_pid_set=[1.32, 0.0, 0.3])
 
-        manager.save_position("goto-LStep1"     , x=-2.15 , y=4.8 , theta=180.0 , speed_limit=2.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
-        manager.save_position("goto-LStep2"     , x=-0.20 , y=7.5 , theta=0.0   , speed_limit=1.30 , curve_strength=0.4 , curve_kp_=1.0 )
-        manager.save_position("goto-LStep3"     , x=-0.20 , y=8.2 , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
-        manager.save_position("goto-LStep4"     , x=-1.50 , y=8.2 , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-LStep1"     , x=-2.15+grab_x_start , y=4.8+grab_y_start , theta=180.0 , speed_limit=2.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-LStep2"     , x=-0.10+grab_x_start , y=7.5+grab_y_start , theta=180.0   , speed_limit=1.30 , curve_strength=0.4 , curve_kp_=1.0 )
+        manager.save_position("goto-LStep3"     , x=-0.20+grab_x_start , y=8.0+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-LStep4"     , x=-1.40+grab_x_start , y=8.0+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
 
 
         manager.save_position("goto-M-IN-1"     , x=(curent_pos_x) + (-0.80) , y=curent_pos_y , theta=180.0 , speed_limit=0.60 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.32, 0.0, 0.3])
@@ -1192,9 +3031,9 @@ class SudSakhonMainController(Node):
         manager.save_position("goto-M-OUT-1"    , x=(curent_pos_x) + (+0.1)  , y=curent_pos_y , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.32, 0.0, 0.3])
         manager.save_position("goto-M-OUT-2"    , x=(curent_pos_x) + (+0.8)  , y=curent_pos_y , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.32, 0.0, 0.3])
 
-        manager.save_position("goto-Home-1"     , x=-0.1 , y=8.0 , theta=180.0 , speed_limit=3.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
-        manager.save_position("goto-Home-2"     , x=0.1 , y=8.0 , theta=270.0 , speed_limit=1.00 , yaw_pid_Set=[300.0,250.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
-        manager.save_position("goto-Home-3"     , x=0.1 , y=1.0 , theta=270.0 , speed_limit=3.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-Home-1"     , x=-0.15+grab_x_start , y=8.0+grab_y_start , theta=180.0 , speed_limit=3.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-Home-2"     , x=-0.15+grab_x_start , y=8.0+grab_y_start , theta=270.0 , speed_limit=1.00 , yaw_pid_Set=[300.0,250.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-Home-3"     , x=0.1+grab_x_start , y=1.0+grab_y_start , theta=270.0 , speed_limit=3.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
 
         #manager.show_all_positions()
 
@@ -1232,7 +3071,7 @@ class SudSakhonMainController(Node):
                 self.Box_Pusher('active')
             self.next_step(2)
 
-        elif self.mission_step == 2 and self.arrived(tol=0.1):
+        elif self.mission_step == 2 and self.arrived(tol=0.3):
             self.ControlBox('up')
 
             if self.ChairCount_RUN == 1:
@@ -1255,7 +3094,7 @@ class SudSakhonMainController(Node):
 
         elif self.mission_step == 2.5: 
             
-            if self.lidar_approach(self.Lidar_center_dist, direction='x+', stop_dist=Lidar_stop_dist, slow_dist=0.45, cruise_speed=0.35, slow_speed=0.08):
+            if self.lidar_approach(self.Lidar_center_dist, direction='x+', stop_dist=Lidar_stop_dist, slow_dist=0.45, cruise_speed=0.25, slow_speed=0.08):
                 
                 self.next_step(2.6)
                 
@@ -1270,7 +3109,7 @@ class SudSakhonMainController(Node):
                 self.ControlBox('stop')
                 time.sleep(0.01)
                 self.ControlSlide('out')
-                time.sleep(0.8)
+                time.sleep(time_out)
                 self.Box_Pusher('unactive')
                 if self.ChairCount_RUN == 1:
                     self.Griper_R('hold')
@@ -1307,11 +3146,11 @@ class SudSakhonMainController(Node):
 
                 self.next_step(4)
 
-        elif self.mission_step == 4 and self.arrived(tol=0.15):
+        elif self.mission_step == 4 and self.arrived(tol=0.25):
             self.next_step(4.5) 
 
         elif self.mission_step == 4.5: 
-            if self.lidar_approach(self.Lidar_center_dist, direction='x+', stop_dist=Lidar_stop_dist, slow_dist=0.40, cruise_speed=0.30, slow_speed=0.1):
+            if self.lidar_approach(self.Lidar_center_dist, direction='x+', stop_dist=Lidar_stop_dist+(-0.05), slow_dist=0.40, cruise_speed=0.30, slow_speed=0.1):
                 msg = Bool()
                 msg.data = True
                 self.ObjectDetech_EN_pub.publish(msg)
@@ -1341,7 +3180,7 @@ class SudSakhonMainController(Node):
             self.ControlBottle_L('stop')
             #time.sleep(0.15)
             self.ControlSlide('out')
-            time.sleep(0.8)
+            time.sleep(time_out)
             self.Box_Pusher('unactive')
             if self.ChairCount_RUN == 1:
                 self.Griper_R('unactive')
@@ -1382,7 +3221,7 @@ class SudSakhonMainController(Node):
             self.next_step(6.4) 
 
         elif self.mission_step == 6.4:
-            if self.arrived(tol=0.15):
+            if self.arrived(tol=0.25):
                 self.get_logger().info('➡️ [Step 6.4] หมุนเสร็จแล้ว: วิ่งกลับไปเสียบจุดเดิมที่ -4.0')
                 self.detected_list = []
                 # กลับไปที่จุดเป้าหมายเดิมที่ -4.0 วางกล่อง
@@ -1393,7 +3232,7 @@ class SudSakhonMainController(Node):
             print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
             # เอาข้อความที่ได้เก็บลง list
             self.detected_list.append(self.DetectedObjects.split(',')[0] )
-            final_result = ''
+            self.final_result = ''
 
             self.Griper_R('hold')
             self.Griper_L('hold')
@@ -1426,17 +3265,17 @@ class SudSakhonMainController(Node):
                         
                         # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
                         if max_count > threshold:
-                            final_result = most_frequent_text
+                            self.final_result = most_frequent_text
 
-                # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) final_result ก็จะเป็น '' เหมือนเดิม
-                print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{final_result}'")
+                # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+                print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
 
-                if final_result == 'bottle':
+                if self.final_result == 'bottle':
                     self.ControlBox('up')
                     self.objpush_table_common = "box"
                     self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
                     self.next_step(7.1) #ไป ลูป สั่งกล่องออก
-                elif final_result == 'box':
+                elif self.final_result == 'box':
                     self.ControlBottle_R('up')
                     self.ControlBottle_L('stop')
                     self.objpush_table_common = "bottle"
@@ -1463,7 +3302,7 @@ class SudSakhonMainController(Node):
 
                 time.sleep(0.01)
                 self.ControlSlide('out')
-                time.sleep(0.8)
+                time.sleep(time_out)
                 self.ControlSlide('in')
                 time.sleep(0.01)
                 self.next_step(8)
@@ -1481,7 +3320,7 @@ class SudSakhonMainController(Node):
             self.ControlBottle_L('stop')
             time.sleep(0.1)
             self.ControlSlide('out')
-            time.sleep(0.8)
+            time.sleep(time_out)
             self.Griper_R('unactive')
             self.Griper_L('hold')
             time.sleep(time_ungripper)
@@ -1512,7 +3351,7 @@ class SudSakhonMainController(Node):
             print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
             # เอาข้อความที่ได้เก็บลง list
             self.detected_list.append(self.DetectedObjects.split(',')[0] )
-            final_result = ''
+            self.final_result = ''
 
             self.Griper_R('hold')
             self.Griper_L('hold')
@@ -1540,16 +3379,16 @@ class SudSakhonMainController(Node):
                         
                         # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
                         if max_count > threshold:
-                            final_result = most_frequent_text
+                            self.final_result = most_frequent_text
 
-                # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) final_result ก็จะเป็น '' เหมือนเดิม
-                print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{final_result}'")
+                # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+                print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
 
-                if final_result == 'bottle':
+                if self.final_result == 'bottle':
                     self.ControlBox('up')
                     self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
                     self.next_step(10.1) #ไป ลูป สั่งกล่องออก
-                elif final_result == 'box':
+                elif self.final_result == 'box':
                     self.ControlBottle_R('stop')
                     self.ControlBottle_L('up')
                     self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
@@ -1579,7 +3418,7 @@ class SudSakhonMainController(Node):
 
                 time.sleep(0.15)
                 self.ControlSlide('out')
-                time.sleep(time_ungripper)
+                time.sleep(time_out)
                 self.ControlSlide('in')
                 time.sleep(0.1)
                 self.next_step(11)
@@ -1598,7 +3437,7 @@ class SudSakhonMainController(Node):
             self.ControlBottle_L('stop')
             time.sleep(0.1)
             self.ControlSlide('out')
-            time.sleep(0.8)
+            time.sleep(time_out)
             self.Griper_R('hold')
             self.Griper_L('unactive')
             time.sleep(time_ungripper)
@@ -1621,7 +3460,7 @@ class SudSakhonMainController(Node):
             #self.go_to_curve(-0.5, -7.5, speed_limit=1.30, curve_strength=0.45, curve_side='AUTO',curve_kp_=1.0)
             self.mission_step = 11.21
 
-        elif self.mission_step == 11.21 and self.arrived(tol=0.3):
+        elif self.mission_step == 11.21 and self.arrived(tol=0.4):
             target_pos = manager.get_position("goto-LStep3")
             self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
             #self.go_to(-0.5, -8.2, 180, speed_limit=0.6, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
@@ -1645,7 +3484,7 @@ class SudSakhonMainController(Node):
                 self.next_step(11.42)
         
         elif self.mission_step == 11.42:   
-            if self.single_sensor_approach(self.sensors.Ultrasonic, direction='x+', stop_dist=0.20, slow_dist=0.20, cruise_speed=0.30, slow_speed=0.1):
+            if self.single_sensor_approach(self.sensors.Ultrasonic, direction='x+', stop_dist=0.30, slow_dist=0.20, cruise_speed=0.30, slow_speed=0.1):
                 print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
                 time.sleep(1.0)
                 #self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
@@ -1667,7 +3506,7 @@ class SudSakhonMainController(Node):
 
             if self.sensors.Ultrasonic >= 1:
                 print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที")
-                time.sleep(1.0)
+                time.sleep(time_LiftUP)
                 self.next_step(12)
         
         elif self.mission_step == 12:
@@ -1706,7 +3545,7 @@ class SudSakhonMainController(Node):
             print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
             # เอาข้อความที่ได้เก็บลง list
             self.detected_list.append(self.DetectedObjects.split(',')[0] )
-            final_result = ''
+            self.final_result = ''
 
             self.Griper_R('hold')
             self.Griper_L('hold')
@@ -1737,16 +3576,16 @@ class SudSakhonMainController(Node):
                         
                         # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
                         if max_count > threshold:
-                            final_result = most_frequent_text
+                            self.final_result = most_frequent_text
 
-                # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) final_result ก็จะเป็น '' เหมือนเดิม
-                print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{final_result}'")
+                # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+                print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
 
-                if final_result == 'bottle':
+                if self.final_result == 'bottle':
                     self.ControlBox('up')
                     self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
                     self.next_step(13.1) #ไป ลูป สั่งกล่องออก
-                elif final_result == 'box':
+                elif self.final_result == 'box':
                     self.ControlBottle_R('up')
                     self.ControlBottle_L('stop')
                     self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
@@ -1844,7 +3683,1686 @@ class SudSakhonMainController(Node):
                 print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
                 self.play_mp3(["/home/ubuntu/Music/liftdown.mp3"])
                 #self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
-                time.sleep(4.0)
+                time.sleep(time_LiftDW)
+                self.next_step(14.12)
+        
+        elif self.mission_step == 14.12:   
+            if self.single_sensor_approach(self.left_ultrasonic_distance, direction='y+', stop_dist=0.30, slow_dist=0.20, cruise_speed=0.30, slow_speed=0.3):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                
+                #time.sleep(4.0)
+                self.next_step(14.2)   
+        
+        elif self.mission_step == 14.2 :
+            print(self.sensors.Ultrasonic)
+            print(f"self.sensors.Ultrasonic: '{self.sensors.Ultrasonic}'")
+
+            if self.sensors.Ultrasonic <= 1:
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที")
+                time.sleep(1.0)
+                self.next_step(15)
+            #self.go_to(-1.4, -8.2, 180, speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            #self.next_step(14.3)
+        
+
+
+        elif self.mission_step == 15:
+
+            target_pos = manager.get_position("goto-Home-1")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            #self.go_to(-0.4, -8.0, 180, speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+            self.next_step(15.05)
+        
+        elif self.mission_step == 15.05 and self.arrived(tol=0.3):
+            target_pos = manager.get_position("goto-Home-2")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-0.4, -8.0, 90, speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=[300.0,250.0, 50.0])
+            self.next_step(15.1)
+
+        elif self.mission_step == 15.1 and self.arrived(tol=0.2):
+            target_pos = manager.get_position("goto-Home-3")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-0.15, -1.0, 90, speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=[125.0, 300.0, 50.0])
+            self.next_step(15.2)
+
+        elif self.mission_step == 15.2 and self.arrived(tol=1.0):  
+            
+            self.next_step(15.3)
+            
+        elif self.mission_step == 15.3: 
+            print(f"self.sensors.Ultrasonic 1: '{self.sensors.Ultrasonic}'")
+            if self.single_sensor_approach(self.sensors.Ultrasonic, direction='x+', stop_dist=0.40, slow_dist=0.60, cruise_speed=0.40, slow_speed=0.4):
+
+                self.next_step(15.4)
+
+        elif self.mission_step == 15.4: 
+            print(f"self.sensors.Ultrasonic 2: '{self.sensors.Ultrasonic}'")
+            if self.single_sensor_approach(self.sensors.Ultrasonic, direction='x+', stop_dist=0.10, slow_dist=0.40, cruise_speed=0.30, slow_speed=0.2):
+
+                self.next_step(15.5)
+
+        elif self.mission_step == 15.5 :   
+            if self.single_sensor_approach(self.left_ultrasonic_distance, direction='y+', stop_dist=0.15, slow_dist=0.20, cruise_speed=0.20, slow_speed=0.20):
+                self.play_mp3(["/home/ubuntu/Music/finish.mp3"]) 
+                self.next_step(15.6)
+            
+        elif self.mission_step == 15.6:
+            print(f"End Program......!")
+
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+            self.Box_Pusher('unactive')
+            self.ControlBottle_R('down')
+            self.ControlBottle_L('down')
+            self.ControlBox('down')
+            #self.play_mp3(["/home/ubuntu/Music/finish.mp3"])
+            # self.play_mp3(["/home/ubuntu/Music/finish.mp3"])
+            self.next_step(150.5)
+        
+        
+            #self.next_step(11.5)
+        
+        # คำสั่งนี้อยู่นอกสุดของ if-elif block เพื่อให้อัปเดตมอเตอร์ตลอดเวลา
+
+    def Program_blue_2(self):
+
+        Lidar_stop_dist = 0.20
+        time_ungripper = 0.5
+
+        time_LiftUP = 3
+        time_LiftDW = 7
+
+        grab_x_start = -0.2
+        grab_y_start = 0.2
+
+        time_out = 0.7
+
+        Speed_side = 2.5
+
+        manager = PositionManager()
+
+        curent_pos_x = self.curr_x
+        curent_pos_y = self.curr_y
+
+        manager.save_position("goto-table1"     , x=-2.30+grab_x_start , y=1.25+grab_y_start , theta=0.0 , speed_limit=1.30 , curve_strength=0.4 , curve_kp_=1.7 )
+        manager.save_position("goto-table2"     , x=-2.20+grab_x_start , y=3.90+grab_y_start , theta=0.0 , speed_limit=1.00 , yaw_pid_Set=[120.0, 300.0, 50.0], pos_x_pid_set=[2.00, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-table2-b"   , x=-2.20+grab_x_start , y=3.90+grab_y_start , theta=0.0 , speed_limit=2.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+
+        manager.save_position("goto-table3"     , x=-2.22+grab_x_start , y=3.90+grab_y_start , theta=180.0 , speed_limit=3.00 , yaw_pid_Set=[300.0, 500.0, 50.0], pos_x_pid_set=[2.00, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-table4"     , x=-2.20+grab_x_start , y=1.78+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[2.00, 0.0, 0.4] , pos_y_pid_set=[1.32, 0.0, 0.3])
+
+        manager.save_position("goto-LStep1"     , x=-2.15+grab_x_start , y=4.8+grab_y_start , theta=180.0 , speed_limit=2.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-LStep2"     , x=-0.10+grab_x_start , y=7.5+grab_y_start , theta=180.0   , speed_limit=1.30 , curve_strength=0.4 , curve_kp_=1.0 )
+        manager.save_position("goto-LStep3"     , x=-0.20+grab_x_start , y=8.151+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-LStep4"     , x=-1.40+grab_x_start , y=8.15+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+
+
+        manager.save_position("goto-M-IN-1"     , x=(curent_pos_x) + (-0.90) , y=curent_pos_y , theta=180.0 , speed_limit=0.60 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-M-IN-2"     , x=curent_pos_x , y=(curent_pos_y) + (-0.85) , theta=180.0 , speed_limit=0.80 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.2, 0.0, 0.3] , pos_y_pid_set=[1.65, 0.0, 0.3])
+
+        manager.save_position("goto-M-OUT-1"    , x=(curent_pos_x) + (+0.1)  , y=curent_pos_y , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-M-OUT-2"    , x=(curent_pos_x) + (+0.9)  , y=curent_pos_y , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.32, 0.0, 0.3])
+
+        manager.save_position("goto-Home-1"     , x=-0.15+grab_x_start , y=8.0+grab_y_start , theta=180.0 , speed_limit=3.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-Home-2"     , x=-0.15+grab_x_start , y=8.0+grab_y_start , theta=270.0 , speed_limit=1.00 , yaw_pid_Set=[300.0,250.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-Home-3"     , x=0.1+grab_x_start , y=0.6+grab_y_start , theta=270.0 , speed_limit=3.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+
+        #manager.show_all_positions()
+
+        if self.mission_step == 0:
+            if self.sensors.SW_1 == 0 or self.ProgramCommand == self.ProgramCommand_Start:
+
+                self.play_mp3(["/home/ubuntu/Music/goto_serve.mp3"])
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+                self.Box_Pusher('unactive')
+                self.ControlBottle_R('down')
+                self.ControlBottle_L('down')
+                self.ControlBox('down')
+                self.ControlSlide('in')
+                
+                self.get_logger().info('🔘 เริ่มภารกิจ!')
+                self.ChairCount_RUN = self.ChairCount
+
+                msg = Bool()
+                msg.data = False
+                self.ObjectDetech_EN_pub.publish(msg)
+
+                self.next_step(1)
+
+        elif self.mission_step == 1 and self.arrived():
+            target_pos = manager.get_position("goto-table1")
+            self.go_to_curve(target_pos.x, target_pos.y, speed_limit=target_pos.speed_limit, curve_strength=target_pos.curve_strength, curve_side='AUTO',curve_kp_=target_pos.curve_kp_)
+            if self.ChairCount_RUN == 1:
+                self.ControlBottle_R('down')
+                self.ControlBottle_L('up')
+                
+            else:
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('up')
+                self.Box_Pusher('active')
+            self.next_step(2)
+
+        elif self.mission_step == 2 and self.arrived(tol=0.3):
+            self.ControlBox('up')
+
+            if self.ChairCount_RUN == 1:
+                if self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0:
+                    self.play_mp3(["/home/ubuntu/Music/serve_1person.mp3"])
+                    self.Griper_R('hold')
+                    self.Griper_L('active')
+                    self.Box_Pusher('unactive')
+                    self.next_step(2.5)
+            else:
+                
+
+                if (self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0) and (self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0):
+                    self.play_mp3(["/home/ubuntu/Music/serve_2person.mp3"])
+                    self.Griper_R('active')
+                    self.Griper_L('active')
+                    self.Box_Pusher('active')
+                    
+                self.next_step(2.5)
+
+        elif self.mission_step == 2.5: 
+            
+            if self.lidar_approach(self.Lidar_center_dist, direction='x+', stop_dist=Lidar_stop_dist-0.04, slow_dist=0.45, cruise_speed=0.25, slow_speed=0.08):
+                
+                self.next_step(2.51)
+
+        elif self.mission_step == 2.51: 
+            if self.align_side_with_sensors(side_speed=Speed_side):
+                self.next_step(2.6)
+                
+        elif self.mission_step == 2.6: 
+            
+            print(f"SensorCheckBoxUp: {self.sensors.SensorCheckBoxUp}, LimitBoxBUp: {self.sensors.LimitBoxBUp}")
+            if (self.sensors.SensorCheckBoxUp == 0 or self.sensors.LimitBoxBUp == 0):
+
+                #time.sleep(0.2)
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.ControlBox('stop')
+                time.sleep(0.01)
+                self.ControlSlide('out')
+                time.sleep(time_out)
+                self.Box_Pusher('unactive')
+                if self.ChairCount_RUN == 1:
+                    self.Griper_R('hold')
+                    self.Griper_L('unactive')
+                else:
+                    self.Griper_R('unactive')
+                    self.Griper_L('unactive')
+                time.sleep(time_ungripper)
+
+                self.ControlSlide('in')
+                time.sleep(0.01)
+                target_pos = manager.get_position("goto-table2")
+                self.go_to(target_pos.x, target_pos.y, target_pos.theta,speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+                self.next_step(3)
+
+        elif self.mission_step == 3:
+            if(self.sensors.LimitBoxBIn == 0):
+                self.countsensor_limitbin += 1
+            if(self.countsensor_limitbin > 3):
+                
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+                self.ControlBox('up')
+
+                if self.ChairCount_RUN == 1:
+                    self.ControlBottle_R('up')
+                    self.ControlBottle_L('up')
+                    self.Box_Pusher('active')
+                    self.play_mp3(["/home/ubuntu/Music/serve_2person.mp3"])
+                else:
+                    self.ControlBottle_R('stop')
+                    self.ControlBottle_L('up')
+                    self.play_mp3(["/home/ubuntu/Music/serve_1person.mp3"])
+
+                self.next_step(4)
+
+        elif self.mission_step == 4 and self.arrived(tol=0.25):
+            self.next_step(4.5) 
+
+        elif self.mission_step == 4.5: 
+            if self.lidar_approach(self.Lidar_center_dist, direction='x+', stop_dist=Lidar_stop_dist+(-0.05), slow_dist=0.40, cruise_speed=0.30, slow_speed=0.1):
+                msg = Bool()
+                msg.data = True
+                self.ObjectDetech_EN_pub.publish(msg)
+                self.next_step(4.51)
+
+        elif self.mission_step == 4.51: 
+            if self.align_side_with_sensors(side_speed=Speed_side):
+                self.next_step(4.6)
+        
+        elif self.mission_step == 4.6: 
+            #self.ControlBox('up')
+            if self.ChairCount_RUN == 1:
+                if (self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0) and (self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0):
+                    self.Griper_R('active')
+                    self.Griper_L('active')
+                    self.Box_Pusher('active')
+
+                    self.next_step(4.7)
+            else:
+                if (self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0):
+                    self.Griper_R('hold')
+                    self.Griper_L('active')
+                    self.Box_Pusher('unactive')
+                    
+
+                    self.next_step(4.7)
+
+        elif self.mission_step == 4.7 :
+            #time.sleep(0.2)
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            #time.sleep(0.15)
+            self.ControlSlide('out')
+            time.sleep(time_out)
+            self.Box_Pusher('unactive')
+            if self.ChairCount_RUN == 1:
+                self.Griper_R('unactive')
+                self.Griper_L('unactive')
+            else:
+                self.Griper_R('unactive')
+                self.Griper_L('unactive')
+            time.sleep(time_ungripper)
+            self.ControlSlide('in')
+            time.sleep(0.01)
+            target_pos = manager.get_position("goto-table2-b")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta,speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-2.15, -3.9, 0, speed_limit=2.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+
+            
+            self.next_step(5)
+
+        elif self.mission_step == 5 :
+            
+            self.next_step(5.5)
+
+        elif self.mission_step == 5.5 :
+            if self.arrived(tol=0.2):
+                self.next_step(6)
+
+        #-------------------------------------------------------------------
+
+        # 🛑 แก้ไขจุดนี้: ยกเลิก SPIN และใช้เทคนิค Shimmy แทน
+        elif self.mission_step == 6:
+            self.get_logger().info('➡️ [Step 6] ใช้เทคนิค Shimmy: ถอยออกมา 15cm พร้อมบังคับหมุน 180 องศา เพื่อปลดล็อค STM32')
+            # ถอย Y ออกมานิดนึงเป็น -3.85 (จากเดิม -4.0) เพื่อให้ระยะ X,Y ไม่เป็นศูนย์ 
+            # (สำคัญ: สังเกตว่าผมเพิ่ม yaw_pid เข้าไปด้วยเพื่อให้มั่นใจว่าบอร์ดมีแรงหมุน)
+
+            target_pos = manager.get_position("goto-table3")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, mode="DIRECT_STM32", speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            #self.go_to(-2.15, -4.0, 180.0, mode="DIRECT_STM32", speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=[300.0,500.0, 50.0])
+            self.next_step(6.4) 
+
+        elif self.mission_step == 6.4:
+            if self.arrived(tol=0.25):
+                self.get_logger().info('➡️ [Step 6.4] หมุนเสร็จแล้ว: วิ่งกลับไปเสียบจุดเดิมที่ -4.0')
+                self.detected_list = []
+                # กลับไปที่จุดเป้าหมายเดิมที่ -4.0 วางกล่อง
+                #self.go_to(-2.25, -4.0, 180.0, mode="DIRECT_STM32", speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.0], yaw_pid=[500.0, 0.0, 25.0])
+                self.next_step(6.5)
+
+        elif self.mission_step == 6.5: 
+            print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
+            # เอาข้อความที่ได้เก็บลง list
+            self.detected_list.append(self.DetectedObjects.split(',')[0] )
+            self.final_result = ''
+
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+
+            #
+            
+            if self.lidar_approach(self.Lidar_center_dist,
+                                direction='x+',
+                                stop_dist=Lidar_stop_dist,
+                                slow_dist=0.40,
+                                cruise_speed=0.30,
+                                slow_speed=0.1):
+                self.next_step(6.51)
+                
+
+        elif self.mission_step == 6.51: 
+            if self.align_side_with_sensors(side_speed=Speed_side):
+                self.next_step(6.52)
+
+        elif self.mission_step == 6.52:
+            if len(self.detected_list) > 0:
+                total_count = len(self.detected_list)
+                threshold = total_count * 0.20  # 20% ของข้อมูลทั้งหมด
+                
+                counted_data = Counter(self.detected_list)
+                
+                # ตัดค่าว่างออกจากตัวนับเพื่อหาข้อความ (Object) ที่เยอะที่สุด
+                if '' in counted_data:
+                    del counted_data['']
+                
+                if len(counted_data) > 0:
+                    most_frequent_text = counted_data.most_common(1)[0][0]
+                    max_count = counted_data.most_common(1)[0][1]
+                    
+                    # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
+                    if max_count > threshold:
+                        self.final_result = most_frequent_text
+
+            # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+            print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
+
+            if self.final_result == 'bottle':
+                self.ControlBox('up')
+                self.objpush_table_common = "box"
+                self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                self.next_step(7.1) #ไป ลูป สั่งกล่องออก
+            elif self.final_result == 'box':
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('stop')
+                self.objpush_table_common = "bottle"
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(7.2) #ไป ลูป สั่งขวดออก
+            else:
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.ControlBox('up')
+                self.objpush_table_common = "box"
+                self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                self.next_step(7.1) #ไป ลูป สั่งขวดออก
+
+        elif self.mission_step == 7.1:
+            #self.ControlBox('up')
+            self.next_step(7.11)
+
+        elif self.mission_step == 7.11:
+            if (self.sensors.SensorCheckBoxUp == 0 or self.sensors.LimitBoxBUp == 0):
+                self.Box_Pusher('unactive')
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+
+                time.sleep(0.01)
+                self.ControlSlide('out')
+                time.sleep(time_out)
+                self.ControlSlide('in')
+                time.sleep(0.01)
+                self.next_step(8)
+        
+        elif self.mission_step == 7.2:
+
+            if (self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0):
+                self.Griper_R('active')
+                self.Griper_L('hold')
+                self.next_step(7.21)
+            
+        elif self.mission_step == 7.21:
+            #time.sleep(0.5)
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            time.sleep(0.1)
+            self.ControlSlide('out')
+            time.sleep(time_out)
+            self.Griper_R('unactive')
+            self.Griper_L('hold')
+            time.sleep(time_ungripper)
+            self.ControlSlide('in')
+            time.sleep(0.01)
+
+            self.next_step(8)
+
+        elif self.mission_step == 8:
+            target_pos = manager.get_position("goto-table4")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-2.20, -1.7, 180, speed_limit=1.0, pos_x_pid=[1.20, 0.0, 0.4], yaw_pid=yaw_pid_Set)
+            
+            self.next_step(9)
+
+        elif self.mission_step == 9:
+            if self.arrived(tol=0.15):
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.detected_list = []
+                # กลับไปที่จุดเป้าหมายเดิมที่ -4.0 วางกล่อง
+                #self.go_to(-2.25, -4.0, 180.0, mode="DIRECT_STM32", speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.0], yaw_pid=[500.0, 0.0, 25.0])
+                self.next_step(9.5)
+
+        elif self.mission_step == 9.5: 
+
+        
+            print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
+            # เอาข้อความที่ได้เก็บลง list
+            self.detected_list.append(self.DetectedObjects.split(',')[0] )
+            self.final_result = ''
+
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+            
+            if self.lidar_approach(self.Lidar_center_dist,
+                                direction='x+',
+                                stop_dist=Lidar_stop_dist ,
+                                slow_dist=0.40,
+                                cruise_speed=0.30,
+                                slow_speed=0.1):
+                self.next_step(9.51)
+                
+
+        elif self.mission_step == 9.51: 
+            if self.align_side_with_sensors(side_speed=Speed_side):
+                self.next_step(9.52)
+
+        elif self.mission_step == 9.52:
+
+            if len(self.detected_list) > 0:
+                total_count = len(self.detected_list)
+                threshold = total_count * 0.20  # 20% ของข้อมูลทั้งหมด
+                
+                counted_data = Counter(self.detected_list)
+                
+                # ตัดค่าว่างออกจากตัวนับเพื่อหาข้อความ (Object) ที่เยอะที่สุด
+                if '' in counted_data:
+                    del counted_data['']
+                
+                if len(counted_data) > 0:
+                    most_frequent_text = counted_data.most_common(1)[0][0]
+                    max_count = counted_data.most_common(1)[0][1]
+                    
+                    # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
+                    if max_count > threshold:
+                        self.final_result = most_frequent_text
+
+            # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+            print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
+
+            if self.final_result == 'bottle':
+                self.ControlBox('up')
+                self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                self.next_step(10.1) #ไป ลูป สั่งกล่องออก
+            elif self.final_result == 'box':
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('up')
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(10.2) #ไป ลูป สั่งขวดออก
+            else:
+                if self.objpush_table_common == "bottle":
+                    self.ControlBox('up')
+                    self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                    self.next_step(10.1) #ไป ลูป สั่งกล่องออก
+                elif self.objpush_table_common == "box":
+                    self.ControlBottle_R('stop')
+                    self.ControlBottle_L('up')
+                    self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                    self.next_step(10.2) #ไป ลูป สั่งขวดออก
+
+        elif self.mission_step == 10.1:
+            #self.ControlBox('up')
+            self.next_step(10.11)
+
+        elif self.mission_step == 10.11:
+            if (self.sensors.SensorCheckBoxUp == 0 or self.sensors.LimitBoxBUp == 0):
+                self.Box_Pusher('unactive')
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+
+                time.sleep(0.15)
+                self.ControlSlide('out')
+                time.sleep(time_out)
+                self.ControlSlide('in')
+                time.sleep(0.1)
+                self.next_step(11)
+    
+        elif self.mission_step == 10.2:
+            if (self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0):
+                self.Griper_R('hold')
+                self.Griper_L('active')
+                self.next_step(10.21)
+
+        elif self.mission_step == 10.21:
+            #self.Griper_R('hold')
+            #self.Griper_L('active')
+            #time.sleep(0.5)
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            time.sleep(0.1)
+            self.ControlSlide('out')
+            time.sleep(time_out)
+            self.Griper_R('hold')
+            self.Griper_L('unactive')
+            time.sleep(time_ungripper)
+            self.ControlSlide('in')
+            time.sleep(0.1)
+            self.next_step(11)
+
+        elif self.mission_step == 11:
+            target_pos = manager.get_position("goto-LStep1")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-2.15, -4.8, 180, speed_limit=2.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+            self.next_step(11.1)
+
+        elif self.mission_step == 11.1 and self.arrived(tol=0.4):
+            self.mission_step = 11.2
+        
+        elif self.mission_step == 11.2:
+            target_pos = manager.get_position("goto-LStep2")
+            self.go_to_curve(target_pos.x, target_pos.y, speed_limit=target_pos.speed_limit, curve_strength=target_pos.curve_strength, curve_side='AUTO',curve_kp_=target_pos.curve_kp_)
+            #self.go_to_curve(-0.5, -7.5, speed_limit=1.30, curve_strength=0.45, curve_side='AUTO',curve_kp_=1.0)
+            self.mission_step = 11.21
+
+        elif self.mission_step == 11.21 and self.arrived(tol=0.4):
+            target_pos = manager.get_position("goto-LStep3")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-0.5, -8.2, 180, speed_limit=0.6, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+            self.next_step(11.3)
+
+        elif self.mission_step == 11.3 and self.arrived(tol=0.2):
+            target_pos = manager.get_position("goto-LStep4")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-1.50, -8.2, 180, speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+            self.next_step(11.4)
+        
+        elif self.mission_step == 11.4 and self.arrived(tol=0.1):
+
+            self.next_step(11.41)
+            
+        elif self.mission_step == 11.41:   
+            if self.single_sensor_approach(self.left_ultrasonic_distance, direction='y+', stop_dist=0.15, slow_dist=0.20, cruise_speed=0.20, slow_speed=0.12):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                #self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
+                #time.sleep(4.0)
+                self.next_step(11.42)
+        
+        elif self.mission_step == 11.42:   
+            if self.single_sensor_approach(self.sensors.Ultrasonic, direction='x+', stop_dist=0.30, slow_dist=0.20, cruise_speed=0.30, slow_speed=0.1):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                time.sleep(1.0)
+                #self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
+                
+                self.next_step(11.421)
+
+        elif self.mission_step == 11.421:   
+            if self.single_sensor_approach(self.right_ultrasonic_distance, direction='y-', stop_dist=0.35, slow_dist=0.10, cruise_speed=0.25, slow_speed=0.25):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                #time.sleep(3.0)
+                self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
+                
+                self.next_step(11.43)
+        
+        elif self.mission_step == 11.43 :
+
+            print(self.sensors.Ultrasonic)
+            print(f"self.sensors.Ultrasonic: '{self.sensors.Ultrasonic}'")
+
+            if self.sensors.Ultrasonic >= 1:
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที")
+                time.sleep(time_LiftUP)
+                self.next_step(12)
+        
+        elif self.mission_step == 12:
+
+            #target_x = (self.curr_x) + (-0.8)
+            #target_y = self.curr_y
+
+            #self.go_to(-2.375, -8.2, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            #self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+
+            target_pos = manager.get_position("goto-M-IN-1")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            self.next_step(12.1)
+
+        elif self.mission_step == 12.1 and self.arrived():
+
+            target_pos = manager.get_position("goto-M-IN-2")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            #target_x = (self.curr_x)
+            #target_y = (self.curr_y) + (+0.75)
+
+            #self.curent_x_lift = target_x
+            #self.curent_y_lift = target_y
+
+            #self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            #self.go_to(-2.375, -7.30, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            self.detected_list = []
+            self.next_step(12.2)
+
+        elif self.mission_step == 12.2 and self.arrived(): 
+            self.next_step(12.3)
+        
+        elif self.mission_step == 12.3:
+            print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
+            # เอาข้อความที่ได้เก็บลง list
+            self.detected_list.append(self.DetectedObjects.split(',')[0] )
+            self.final_result = ''
+
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            
+            if self.lidar_approach(self.Lidar_center_dist,
+                                direction='x+',
+                                stop_dist=Lidar_stop_dist,
+                                slow_dist=0.20,
+                                cruise_speed=0.20,
+                                slow_speed=0.1):
+
+                self.next_step(12.51)
+            
+        elif self.mission_step == 12.51: 
+            if self.align_side_with_sensors(side_speed=Speed_side):
+                self.next_step(12.52)
+
+        elif self.mission_step == 12.52:
+
+            if len(self.detected_list) > 0:
+                total_count = len(self.detected_list)
+                threshold = total_count * 0.20  # 20% ของข้อมูลทั้งหมด
+                
+                counted_data = Counter(self.detected_list)
+                
+                # ตัดค่าว่างออกจากตัวนับเพื่อหาข้อความ (Object) ที่เยอะที่สุด
+                if '' in counted_data:
+                    del counted_data['']
+                
+                if len(counted_data) > 0:
+                    most_frequent_text = counted_data.most_common(1)[0][0]
+                    max_count = counted_data.most_common(1)[0][1]
+                    
+                    # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
+                    if max_count > threshold:
+                        self.final_result = most_frequent_text
+
+            # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+            print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
+
+            if self.final_result == 'bottle':
+                self.ControlBox('up')
+                self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                self.next_step(13.1) #ไป ลูป สั่งกล่องออก
+            elif self.final_result == 'box':
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('stop')
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(13.2) #ไป ลูป สั่งขวดออก
+            else:
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('stop')
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(13.2) #ไป ลูป สั่งขวดออก
+
+        elif self.mission_step == 13.1:
+            self.next_step(13.11)
+
+        elif self.mission_step == 13.11:
+            if (self.sensors.SensorCheckBoxUp == 0 or self.sensors.LimitBoxBUp == 0):
+                self.Box_Pusher('unactive')
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+
+                time.sleep(0.01)
+                self.ControlSlide('out')
+                time.sleep(0.8)
+                self.ControlSlide('in')
+                time.sleep(0.01)
+                self.next_step(14)
+    
+        elif self.mission_step == 13.2:
+            if (self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0):
+                self.Griper_R('active')
+                self.Griper_L('hold')
+                self.next_step(13.21)
+
+        elif self.mission_step == 13.21:
+            #self.Griper_R('hold')
+            #self.Griper_L('active')
+            #time.sleep(0.5)
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            time.sleep(0.01)
+            self.ControlSlide('out')
+            time.sleep(0.8)
+            self.Griper_R('unactive')
+            self.Griper_L('hold')
+            time.sleep(time_ungripper)
+            self.ControlSlide('in')
+            time.sleep(0.01)
+            
+            self.next_step(14)
+        
+        elif self.mission_step == 14:
+
+
+            #target_x = (self.curent_x_lift) + (+0.1)
+            #target_y = (self.curent_y_lift) + (-0.70)
+            #self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            
+
+            msg = Bool()
+            msg.data = False
+            self.ObjectDetech_EN_pub.publish(msg)
+
+
+            target_pos = manager.get_position("goto-M-OUT-1")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            self.next_step(14.01)
+
+        elif self.mission_step == 14.01:
+            if self.arrived():
+                self.next_step(14.02)
+
+        elif self.mission_step == 14.02:
+            if self.single_sensor_approach(self.right_ultrasonic_distance, direction='y-', stop_dist=0.30, slow_dist=0.40, cruise_speed=0.40, slow_speed=0.30):
+                self.next_step(14.1)
+
+        elif self.mission_step == 14.1:
+
+            #target_x = (self.curr_x) + (+0.8)
+            #target_y = self.curr_y
+            #self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            
+            target_pos = manager.get_position("goto-M-OUT-2")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            self.next_step(14.11)
+
+        elif self.mission_step == 14.11 and self.arrived(tol=0.1):
+            #self.go_to_curve(0.0, -0.3, speed_limit=0.6, curve_strength=0.4, curve_side='AUTO',curve_kp_=1.3)
+            self.next_step(14.111)
+
+        elif self.mission_step == 14.111 :   
+            if self.single_sensor_approach(self.right_ultrasonic_distance, direction='y-', stop_dist=0.20, slow_dist=0.20, cruise_speed=0.30, slow_speed=0.3):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                self.play_mp3(["/home/ubuntu/Music/liftdown.mp3"])
+                #self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
+                time.sleep(time_LiftDW)
+                self.next_step(14.12)
+        
+        elif self.mission_step == 14.12:   
+            if self.single_sensor_approach(self.left_ultrasonic_distance, direction='y+', stop_dist=0.30, slow_dist=0.20, cruise_speed=0.30, slow_speed=0.3):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                
+                #time.sleep(4.0)
+                self.next_step(14.2)   
+        
+        elif self.mission_step == 14.2 :
+            print(self.sensors.Ultrasonic)
+            print(f"self.sensors.Ultrasonic: '{self.sensors.Ultrasonic}'")
+
+            if self.sensors.Ultrasonic <= 1:
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที")
+                time.sleep(1.0)
+                self.next_step(15)
+            #self.go_to(-1.4, -8.2, 180, speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            #self.next_step(14.3)
+        
+
+
+        elif self.mission_step == 15:
+
+            target_pos = manager.get_position("goto-Home-1")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            #self.go_to(-0.4, -8.0, 180, speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+            self.next_step(15.05)
+        
+        elif self.mission_step == 15.05 and self.arrived(tol=0.3):
+            target_pos = manager.get_position("goto-Home-2")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-0.4, -8.0, 90, speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=[300.0,250.0, 50.0])
+            self.next_step(15.1)
+
+        elif self.mission_step == 15.1 and self.arrived(tol=0.2):
+            target_pos = manager.get_position("goto-Home-3")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-0.15, -1.0, 90, speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=[125.0, 300.0, 50.0])
+            self.next_step(15.2)
+
+        elif self.mission_step == 15.2 and self.arrived(tol=1.0):  
+            
+            self.next_step(15.3)
+            
+        elif self.mission_step == 15.3: 
+            print(f"self.sensors.Ultrasonic 1: '{self.sensors.Ultrasonic}'")
+            if self.single_sensor_approach(self.sensors.Ultrasonic, direction='x+', stop_dist=0.40, slow_dist=0.60, cruise_speed=0.40, slow_speed=0.4):
+
+                self.next_step(15.4)
+
+        elif self.mission_step == 15.4: 
+            print(f"self.sensors.Ultrasonic 2: '{self.sensors.Ultrasonic}'")
+            if self.single_sensor_approach(self.sensors.Ultrasonic, direction='x+', stop_dist=0.10, slow_dist=0.40, cruise_speed=0.30, slow_speed=0.2):
+
+                self.next_step(15.5)
+
+        elif self.mission_step == 15.5 :   
+            if self.single_sensor_approach(self.left_ultrasonic_distance, direction='y+', stop_dist=0.15, slow_dist=0.20, cruise_speed=0.20, slow_speed=0.20):
+                self.play_mp3(["/home/ubuntu/Music/finish.mp3"]) 
+                self.next_step(15.6)
+            
+        elif self.mission_step == 15.6:
+            print(f"End Program......!")
+
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+            self.Box_Pusher('unactive')
+            self.ControlBottle_R('down')
+            self.ControlBottle_L('down')
+            self.ControlBox('down')
+            #self.play_mp3(["/home/ubuntu/Music/finish.mp3"])
+            # self.play_mp3(["/home/ubuntu/Music/finish.mp3"])
+            self.next_step(150.5)
+        
+        
+            #self.next_step(11.5)
+        
+        # คำสั่งนี้อยู่นอกสุดของ if-elif block เพื่อให้อัปเดตมอเตอร์ตลอดเวลา
+
+    def Program_blue_3(self):
+
+        Lidar_stop_dist = 0.20
+        time_ungripper = 0.5
+
+        time_LiftUP = 3
+        time_LiftDW = 8
+
+        grab_x_start = -0.2
+        grab_y_start = 0.2
+
+        time_out = 0.7
+
+        Speed_side = 0.25
+
+        time_out_BBR = 5.0
+        time_hold = 0.3
+
+        manager = PositionManager()
+
+        curent_pos_x = self.curr_x
+        curent_pos_y = self.curr_y
+
+        manager.save_position("goto-table1"     , x=-2.20+grab_x_start , y=1.25+grab_y_start , theta=0.0 , speed_limit=1.30 , curve_strength=0.4 , curve_kp_=1.3 )
+        manager.save_position("goto-table2"     , x=-2.20+grab_x_start , y=3.90+grab_y_start , theta=0.0 , speed_limit=1.00 , yaw_pid_Set=[120.0, 300.0, 50.0], pos_x_pid_set=[2.00, 0.0, 0.4] , pos_y_pid_set=[1.2, 0.0, 0.3])
+        manager.save_position("goto-table2-b"   , x=-2.20+grab_x_start , y=4.00+grab_y_start , theta=0.0 , speed_limit=2.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[2.25, 0.0, 0.4] , pos_y_pid_set=[1.32, 0.0, 0.3])
+
+        manager.save_position("goto-table3"     , x=-2.22+grab_x_start , y=4.00+grab_y_start , theta=180.0 , speed_limit=3.00 , yaw_pid_Set=[300.0, 500.0, 50.0], pos_x_pid_set=[2.00, 0.0, 0.4] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-table4"     , x=-2.20+grab_x_start , y=1.78+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[2.00, 0.0, 0.4] , pos_y_pid_set=[1.32, 0.0, 0.3])
+
+        manager.save_position("goto-LStep1"     , x=-2.15+grab_x_start , y=4.8+grab_y_start , theta=180.0 , speed_limit=2.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-LStep2"     , x=-0.10+grab_x_start , y=7.5+grab_y_start , theta=180.0   , speed_limit=1.30 , curve_strength=0.4 , curve_kp_=1.0 )
+        manager.save_position("goto-LStep3"     , x=-0.20+grab_x_start , y=8.151+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-LStep4"     , x=-1.40+grab_x_start , y=8.15+grab_y_start , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+
+        manager.save_position("goto-M-IN-1"     , x=(curent_pos_x) + (-0.90) , y=curent_pos_y , theta=180.0 , speed_limit=0.60 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-M-IN-2"     , x=curent_pos_x , y=(curent_pos_y) + (-0.85) , theta=180.0 , speed_limit=0.80 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.2, 0.0, 0.3] , pos_y_pid_set=[1.65, 0.0, 0.3])
+
+        manager.save_position("goto-M-OUT-1"    , x=(curent_pos_x) + (+0.1)  , y=curent_pos_y , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-M-OUT-2"    , x=(curent_pos_x) + (+0.9)  , y=curent_pos_y , theta=180.0 , speed_limit=1.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.7, 0.0, 0.0] , pos_y_pid_set=[1.32, 0.0, 0.3])
+
+        manager.save_position("goto-Home-1"     , x=-0.15+grab_x_start , y=8.0+grab_y_start , theta=180.0 , speed_limit=3.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-Home-2"     , x=-0.15+grab_x_start , y=8.0+grab_y_start , theta=270.0 , speed_limit=1.00 , yaw_pid_Set=[300.0,250.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+        manager.save_position("goto-Home-3"     , x=0.1+grab_x_start , y=0.6+grab_y_start , theta=270.0 , speed_limit=3.00 , yaw_pid_Set=[125.0, 300.0, 50.0], pos_x_pid_set=[1.25, 0.0, 0.1] , pos_y_pid_set=[1.32, 0.0, 0.3])
+
+        #manager.show_all_positions()
+
+        if self.mission_step == 0:
+            if self.sensors.SW_1 == 0 or self.ProgramCommand == self.ProgramCommand_Start:
+
+                self.play_mp3(["/home/ubuntu/Music/goto_serve.mp3"])
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+                self.Box_Pusher('unactive')
+                self.ControlBottle_R('down')
+                self.ControlBottle_L('down')
+                self.ControlBox('down')
+                self.ControlSlide('in')
+                
+                self.get_logger().info('🔘 เริ่มภารกิจ!')
+                self.ChairCount_RUN = self.ChairCount
+
+                msg = Bool()
+                msg.data = False
+                self.ObjectDetech_EN_pub.publish(msg)
+
+                self.next_step(1)
+
+        elif self.mission_step == 1 and self.arrived():
+            target_pos = manager.get_position("goto-table1")
+            self.go_to_curve(target_pos.x, target_pos.y, speed_limit=target_pos.speed_limit, curve_strength=target_pos.curve_strength, curve_side='AUTO',curve_kp_=target_pos.curve_kp_)
+            if self.ChairCount_RUN == 1:
+                self.ControlBottle_R('down')
+                self.ControlBottle_L('up')
+                
+            else:
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('up')
+                self.Box_Pusher('active')
+            self.next_step(2)
+
+        elif self.mission_step == 2 and self.arrived(tol=0.2):
+            self.ControlBox('up')
+
+            if self.ChairCount_RUN == 1:
+                if self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0:
+                    self.play_mp3(["/home/ubuntu/Music/serve_1person.mp3"])
+                    self.Griper_R('hold')
+                    self.Griper_L('active')
+                    self.Box_Pusher('unactive')
+                    self.next_step(2.5)
+            else:
+                
+
+                if (self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0) and (self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0):
+                    self.play_mp3(["/home/ubuntu/Music/serve_2person.mp3"])
+                    self.Griper_R('active')
+                    self.Griper_L('active')
+                    self.Box_Pusher('active')
+                    
+                self.next_step(2.5)
+
+        elif self.mission_step == 2.5: 
+            
+            if self.lidar_approach(self.Lidar_center_dist, direction='x+', stop_dist=Lidar_stop_dist-0.06, slow_dist=0.45, cruise_speed=0.25, slow_speed=0.08):
+                
+                self.next_step(2.51)
+
+        elif self.mission_step == 2.51: 
+            if self.align_side_with_sensors(side_speed=Speed_side):
+                self.next_step(2.6)
+                
+        elif self.mission_step == 2.6: 
+            
+            print(f"SensorCheckBoxUp: {self.sensors.SensorCheckBoxUp}, LimitBoxBUp: {self.sensors.LimitBoxBUp}")
+            if (self.sensors.SensorCheckBoxUp == 0 or self.sensors.LimitBoxBUp == 0):
+
+                #time.sleep(0.2)
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.ControlBox('stop')
+                time.sleep(0.01)
+                self.ControlSlide('out')
+                time.sleep(time_out)
+                self.Box_Pusher('unactive')
+                if self.ChairCount_RUN == 1:
+                    self.Griper_R('hold')
+                    self.Griper_L('hold')
+                    time.sleep(time_hold)
+                    self.Griper_R('hold')
+                    self.Griper_L('unactive')
+                else:
+                    self.Griper_R('hold')
+                    self.Griper_L('hold')
+                    time.sleep(time_hold)
+                    self.Griper_R('unactive')
+                    self.Griper_L('unactive')
+                time.sleep(time_ungripper)
+
+                self.ControlSlide('in')
+                time.sleep(0.01)
+                target_pos = manager.get_position("goto-table2")
+                self.go_to(target_pos.x, target_pos.y, target_pos.theta,speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+                self.next_step(3)
+
+        elif self.mission_step == 3:
+            if(self.sensors.LimitBoxBIn == 0):
+                self.countsensor_limitbin += 1
+            if(self.countsensor_limitbin > 3):
+                
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+                self.ControlBox('up')
+
+                if self.ChairCount_RUN == 1:
+                    self.ControlBottle_R('up')
+                    self.ControlBottle_L('up')
+                    self.Box_Pusher('active')
+                    self.play_mp3(["/home/ubuntu/Music/serve_2person.mp3"])
+                else:
+                    self.ControlBottle_R('stop')
+                    self.ControlBottle_L('up')
+                    self.play_mp3(["/home/ubuntu/Music/serve_1person.mp3"])
+
+                self.next_step(4)
+
+        elif self.mission_step == 4 and self.arrived(tol=0.35):
+            self.next_step(4.5) 
+
+        elif self.mission_step == 4.5: 
+            if self.lidar_approach(self.Lidar_center_dist, direction='x+', stop_dist=Lidar_stop_dist+(-0.05), slow_dist=0.40, cruise_speed=0.30, slow_speed=0.2):
+                msg = Bool()
+                msg.data = True
+                self.ObjectDetech_EN_pub.publish(msg)
+                self.next_step(4.51)
+
+        elif self.mission_step == 4.51: 
+            if self.align_side_with_sensors(side_speed=Speed_side):
+                self.next_step(4.6)
+        
+        elif self.mission_step == 4.6: 
+            #self.ControlBox('up')
+            if self.ChairCount_RUN == 1:
+                if (self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0) and (self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0):
+                    self.Griper_R('active')
+                    self.Griper_L('active')
+                    self.Box_Pusher('active')
+
+                    self.next_step(4.7)
+            else:
+                if (self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0):
+                    self.Griper_R('hold')
+                    self.Griper_L('active')
+                    self.Box_Pusher('unactive')
+                    
+
+                    self.next_step(4.7)
+
+        elif self.mission_step == 4.7 :
+            #time.sleep(0.2)
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            #time.sleep(0.15)
+            self.ControlSlide('out')
+            time.sleep(time_out)
+
+
+            self.Box_Pusher('unactive')
+            if self.ChairCount_RUN == 1:
+                
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+                time.sleep(time_hold)
+                self.Griper_R('unactive')
+                self.Griper_L('unactive')
+            else:
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+                time.sleep(time_hold)
+                self.Griper_R('unactive')
+                self.Griper_L('unactive')
+            time.sleep(time_ungripper)
+            self.ControlSlide('in')
+            time.sleep(0.01)
+            target_pos = manager.get_position("goto-table2-b")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta,speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-2.15, -3.9, 0, speed_limit=2.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+
+            
+            self.next_step(5)
+
+        elif self.mission_step == 5 :
+            
+            self.next_step(5.5)
+
+        elif self.mission_step == 5.5 :
+            if self.arrived(tol=0.2):
+                self.next_step(6)
+
+        #-------------------------------------------------------------------
+
+        # 🛑 แก้ไขจุดนี้: ยกเลิก SPIN และใช้เทคนิค Shimmy แทน
+        elif self.mission_step == 6:
+            self.get_logger().info('➡️ [Step 6] ใช้เทคนิค Shimmy: ถอยออกมา 15cm พร้อมบังคับหมุน 180 องศา เพื่อปลดล็อค STM32')
+            # ถอย Y ออกมานิดนึงเป็น -3.85 (จากเดิม -4.0) เพื่อให้ระยะ X,Y ไม่เป็นศูนย์ 
+            # (สำคัญ: สังเกตว่าผมเพิ่ม yaw_pid เข้าไปด้วยเพื่อให้มั่นใจว่าบอร์ดมีแรงหมุน)
+
+            target_pos = manager.get_position("goto-table3")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, mode="DIRECT_STM32", speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            #self.go_to(-2.15, -4.0, 180.0, mode="DIRECT_STM32", speed_limit=3.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=[300.0,500.0, 50.0])
+            self.next_step(6.4) 
+
+        elif self.mission_step == 6.4:
+            if self.arrived(tol=0.25):
+                self.get_logger().info('➡️ [Step 6.4] หมุนเสร็จแล้ว: วิ่งกลับไปเสียบจุดเดิมที่ -4.0')
+                self.detected_list = []
+                # กลับไปที่จุดเป้าหมายเดิมที่ -4.0 วางกล่อง
+                #self.go_to(-2.25, -4.0, 180.0, mode="DIRECT_STM32", speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.0], yaw_pid=[500.0, 0.0, 25.0])
+                self.next_step(6.5)
+
+        elif self.mission_step == 6.5: 
+            print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
+            # เอาข้อความที่ได้เก็บลง list
+            self.detected_list.append(self.DetectedObjects.split(',')[0] )
+            self.final_result = ''
+
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+
+            #self.ControlBottle_R('stop')
+            #self.ControlBottle_L('stop')
+
+            #
+            
+            if self.lidar_approach(self.Lidar_center_dist,
+                                direction='x+',
+                                stop_dist=Lidar_stop_dist,
+                                slow_dist=0.40,
+                                cruise_speed=0.30,
+                                slow_speed=0.1):
+                self.next_step(6.51)
+                
+
+        elif self.mission_step == 6.51: 
+            if self.align_side_with_sensors(side_speed=Speed_side):
+                self.next_step(6.52)
+
+        elif self.mission_step == 6.52:
+            if len(self.detected_list) > 0:
+                total_count = len(self.detected_list)
+                threshold = total_count * 0.20  # 20% ของข้อมูลทั้งหมด
+                
+                counted_data = Counter(self.detected_list)
+                
+                # ตัดค่าว่างออกจากตัวนับเพื่อหาข้อความ (Object) ที่เยอะที่สุด
+                if '' in counted_data:
+                    del counted_data['']
+                
+                if len(counted_data) > 0:
+                    most_frequent_text = counted_data.most_common(1)[0][0]
+                    max_count = counted_data.most_common(1)[0][1]
+                    
+                    # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
+                    if max_count > threshold:
+                        self.final_result = most_frequent_text
+
+            # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+            print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
+
+            if self.final_result == 'bottle':
+                self.ControlBox('up')
+
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+
+                self.objpush_table_common = "box"
+                self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                self.next_step(7.1) #ไป ลูป สั่งกล่องออก
+            elif self.final_result == 'box':
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('stop')
+                self.objpush_table_common = "bottle"
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(7.2) #ไป ลูป สั่งขวดออก
+            else:
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('up')
+                self.ControlBox('up')
+                self.objpush_table_common = "box"
+                self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                self.next_step(7.3) #ไป ลูป สั่งขวดออก
+
+
+        elif self.mission_step == 7.1:
+            #self.ControlBox('up')
+            self.next_step(7.11)
+
+        elif self.mission_step == 7.11:
+            if (self.sensors.SensorCheckBoxUp == 0 or self.sensors.LimitBoxBUp == 0):
+
+                self.Box_Pusher('unactive')
+                
+                #self.Griper_R('active')
+                #self.Griper_L('active')
+
+                time.sleep(0.01)
+                self.ControlSlide('out')
+                #self.ControlBottle_R('down')
+                #self.ControlBottle_L('down')
+                time.sleep(time_out)
+                self.ControlSlide('in')
+                time.sleep(0.01)
+                #self.ControlBottle_R('stop')
+                #self.ControlBottle_L('stop')
+                #time.sleep(0.5)
+                #self.Griper_R('unactive')
+                #self.Griper_L('unactive')
+
+                self.next_step(8)
+
+
+        elif self.mission_step == 7.3:
+            #self.ControlBox('up')
+            self.next_step(7.31)
+
+        elif self.mission_step == 7.31:
+            if ((self.sensors.SensorCheckBoxUp == 0 or self.sensors.LimitBoxBUp == 0) and 
+            (self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0) and
+            self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0):
+
+                self.Box_Pusher('unactive')
+                
+                self.Griper_R('active')
+                self.Griper_L('active')
+
+                time.sleep(0.01)
+                self.ControlSlide('out')
+                self.ControlBottle_R('down')
+                self.ControlBottle_L('down')
+                time.sleep(time_out_BBR)
+                self.ControlSlide('in')
+                time.sleep(0.01)
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                time.sleep(0.5)
+                self.Griper_R('unactive')
+                self.Griper_L('unactive')
+
+                self.next_step(8)
+        
+        elif self.mission_step == 7.2:
+
+            if (self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0):
+                self.Griper_R('active')
+                self.Griper_L('hold')
+                self.next_step(7.21)
+            
+        elif self.mission_step == 7.21:
+            #time.sleep(0.5)
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            time.sleep(0.1)
+            self.ControlSlide('out')
+            time.sleep(time_out)
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+            time.sleep(time_hold)
+            self.Griper_R('unactive')
+            self.Griper_L('hold')
+            time.sleep(time_ungripper)
+            self.ControlSlide('in')
+            time.sleep(0.01)
+
+            self.next_step(8)
+
+        elif self.mission_step == 8:
+            target_pos = manager.get_position("goto-table4")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-2.20, -1.7, 180, speed_limit=1.0, pos_x_pid=[1.20, 0.0, 0.4], yaw_pid=yaw_pid_Set)
+            
+            self.next_step(9)
+
+        elif self.mission_step == 9:
+            
+            if self.arrived(tol=0.15):
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.detected_list = []
+                # กลับไปที่จุดเป้าหมายเดิมที่ -4.0 วางกล่อง
+                #self.go_to(-2.25, -4.0, 180.0, mode="DIRECT_STM32", speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.0], yaw_pid=[500.0, 0.0, 25.0])
+                self.next_step(9.5)
+
+        elif self.mission_step == 9.5: 
+
+        
+            print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
+            # เอาข้อความที่ได้เก็บลง list
+            self.detected_list.append(self.DetectedObjects.split(',')[0] )
+            self.final_result = ''
+
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+            
+            if self.lidar_approach(self.Lidar_center_dist,
+                                direction='x+',
+                                stop_dist=Lidar_stop_dist ,
+                                slow_dist=0.40,
+                                cruise_speed=0.30,
+                                slow_speed=0.1):
+                self.next_step(9.51)
+                
+
+        elif self.mission_step == 9.51: 
+            if self.align_side_with_sensors(side_speed=Speed_side):
+                self.next_step(9.52)
+
+        elif self.mission_step == 9.52:
+
+            if len(self.detected_list) > 0:
+                total_count = len(self.detected_list)
+                threshold = total_count * 0.20  # 20% ของข้อมูลทั้งหมด
+                
+                counted_data = Counter(self.detected_list)
+                
+                # ตัดค่าว่างออกจากตัวนับเพื่อหาข้อความ (Object) ที่เยอะที่สุด
+                if '' in counted_data:
+                    del counted_data['']
+                
+                if len(counted_data) > 0:
+                    most_frequent_text = counted_data.most_common(1)[0][0]
+                    max_count = counted_data.most_common(1)[0][1]
+                    
+                    # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
+                    if max_count > threshold:
+                        self.final_result = most_frequent_text
+
+            # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+            print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
+
+            if self.final_result == 'bottle':
+                self.ControlBox('up')
+                self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                self.next_step(10.1) #ไป ลูป สั่งกล่องออก
+            elif self.final_result == 'box':
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('up')
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(10.2) #ไป ลูป สั่งขวดออก
+            else:
+                if self.objpush_table_common == "bottle":
+                    self.ControlBox('up')
+                    self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                    self.next_step(10.1) #ไป ลูป สั่งกล่องออก
+                elif self.objpush_table_common == "box":
+                    self.ControlBottle_R('stop')
+                    self.ControlBottle_L('up')
+                    self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                    self.next_step(10.2) #ไป ลูป สั่งขวดออก
+
+        elif self.mission_step == 10.1:
+            #self.ControlBox('up')
+            self.next_step(10.11)
+
+        elif self.mission_step == 10.11:
+            if (self.sensors.SensorCheckBoxUp == 0 or self.sensors.LimitBoxBUp == 0):
+                self.Box_Pusher('unactive')
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+
+                time.sleep(0.15)
+                self.ControlSlide('out')
+                time.sleep(time_out)
+                self.ControlSlide('in')
+                time.sleep(0.1)
+                self.next_step(11)
+    
+        elif self.mission_step == 10.2:
+            if (self.sensors.SensorbottleL_B_UP == 0 or self.sensors.SensorbottleL_Check == 0):
+                self.Griper_R('hold')
+                self.Griper_L('active')
+                self.next_step(10.21)
+
+        elif self.mission_step == 10.21:
+            #self.Griper_R('hold')
+            #self.Griper_L('active')
+            #time.sleep(0.5)
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            time.sleep(0.1)
+            self.ControlSlide('out')
+            time.sleep(time_out)
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+            time.sleep(time_hold)
+            self.Griper_R('hold')
+            self.Griper_L('unactive')
+            time.sleep(time_ungripper)
+            self.ControlSlide('in')
+            time.sleep(0.1)
+            self.next_step(11)
+
+        elif self.mission_step == 11:
+            target_pos = manager.get_position("goto-LStep1")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-2.15, -4.8, 180, speed_limit=2.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+            self.next_step(11.1)
+
+        elif self.mission_step == 11.1 and self.arrived(tol=0.4):
+            self.mission_step = 11.2
+        
+        elif self.mission_step == 11.2:
+            target_pos = manager.get_position("goto-LStep2")
+            self.go_to_curve(target_pos.x, target_pos.y, speed_limit=target_pos.speed_limit, curve_strength=target_pos.curve_strength, curve_side='AUTO',curve_kp_=target_pos.curve_kp_)
+            #self.go_to_curve(-0.5, -7.5, speed_limit=1.30, curve_strength=0.45, curve_side='AUTO',curve_kp_=1.0)
+            self.mission_step = 11.21
+
+        elif self.mission_step == 11.21 and self.arrived(tol=0.4):
+            target_pos = manager.get_position("goto-LStep3")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-0.5, -8.2, 180, speed_limit=0.6, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+            self.next_step(11.3)
+
+        elif self.mission_step == 11.3 and self.arrived(tol=0.2):
+            target_pos = manager.get_position("goto-LStep4")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+            #self.go_to(-1.50, -8.2, 180, speed_limit=1.0, pos_x_pid=[1.25, 0.0, 0.1], yaw_pid=yaw_pid_Set)
+            self.next_step(11.4)
+        
+        elif self.mission_step == 11.4 and self.arrived(tol=0.1):
+
+            self.next_step(11.41)
+            
+        elif self.mission_step == 11.41:   
+            if self.single_sensor_approach(self.left_ultrasonic_distance, direction='y+', stop_dist=0.15, slow_dist=0.20, cruise_speed=0.20, slow_speed=0.12):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                #self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
+                #time.sleep(4.0)
+                self.next_step(11.42)
+        
+        elif self.mission_step == 11.42:   
+            if self.single_sensor_approach(self.sensors.Ultrasonic, direction='x+', stop_dist=0.30, slow_dist=0.20, cruise_speed=0.30, slow_speed=0.1):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                time.sleep(1.0)
+                #self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
+                
+                self.next_step(11.421)
+
+        elif self.mission_step == 11.421:   
+            if self.single_sensor_approach(self.right_ultrasonic_distance, direction='y-', stop_dist=0.35, slow_dist=0.10, cruise_speed=0.25, slow_speed=0.25):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                #time.sleep(3.0)
+                self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
+                
+                self.next_step(11.43)
+        
+        elif self.mission_step == 11.43 :
+
+            print(self.sensors.Ultrasonic)
+            print(f"self.sensors.Ultrasonic: '{self.sensors.Ultrasonic}'")
+
+            if self.sensors.Ultrasonic >= 1:
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที")
+                time.sleep(time_LiftUP)
+                self.next_step(12)
+        
+        elif self.mission_step == 12:
+
+            #target_x = (self.curr_x) + (-0.8)
+            #target_y = self.curr_y
+
+            #self.go_to(-2.375, -8.2, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            #self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+
+            target_pos = manager.get_position("goto-M-IN-1")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            self.next_step(12.1)
+
+        elif self.mission_step == 12.1 and self.arrived():
+
+            target_pos = manager.get_position("goto-M-IN-2")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            #target_x = (self.curr_x)
+            #target_y = (self.curr_y) + (+0.75)
+
+            #self.curent_x_lift = target_x
+            #self.curent_y_lift = target_y
+
+            #self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            #self.go_to(-2.375, -7.30, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            self.detected_list = []
+            self.next_step(12.2)
+
+        elif self.mission_step == 12.2 and self.arrived(): 
+            self.next_step(12.3)
+        
+        elif self.mission_step == 12.3:
+            print(f"DetectedObjects: {self.DetectedObjects.split(',')[0]}") # ปรินต์เช็คค่าได้ปกติ
+            # เอาข้อความที่ได้เก็บลง list
+            self.detected_list.append(self.DetectedObjects.split(',')[0] )
+            self.final_result = ''
+
+            self.Griper_R('hold')
+            self.Griper_L('hold')
+
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            
+            if self.lidar_approach(self.Lidar_center_dist,
+                                direction='x+',
+                                stop_dist=Lidar_stop_dist,
+                                slow_dist=0.20,
+                                cruise_speed=0.20,
+                                slow_speed=0.1):
+
+                self.next_step(12.51)
+            
+        elif self.mission_step == 12.51: 
+            if self.align_side_with_sensors(side_speed=Speed_side):
+                self.next_step(12.52)
+
+        elif self.mission_step == 12.52:
+
+            if len(self.detected_list) > 0:
+                total_count = len(self.detected_list)
+                threshold = total_count * 0.20  # 20% ของข้อมูลทั้งหมด
+                
+                counted_data = Counter(self.detected_list)
+                
+                # ตัดค่าว่างออกจากตัวนับเพื่อหาข้อความ (Object) ที่เยอะที่สุด
+                if '' in counted_data:
+                    del counted_data['']
+                
+                if len(counted_data) > 0:
+                    most_frequent_text = counted_data.most_common(1)[0][0]
+                    max_count = counted_data.most_common(1)[0][1]
+                    
+                    # ถ้าข้อความที่เจอเยอะที่สุด มีจำนวนมากกว่า 20% ให้เปลี่ยนผลลัพธ์เป็นข้อความนั้น
+                    if max_count > threshold:
+                        self.final_result = most_frequent_text
+
+            # ถ้าไม่เข้าเงื่อนไข (เช่น มีแต่ค่าว่าง หรือข้อความไม่ถึง 20%) self.final_result ก็จะเป็น '' เหมือนเดิม
+            print(f"ผลลัพธ์ที่จะนำไปใช้ต่อคือ: '{self.final_result}'")
+
+            if self.final_result == 'bottle':
+                self.ControlBox('up')
+                self.play_mp3(["/home/ubuntu/Music/serve_box.mp3"])
+                self.next_step(13.1) #ไป ลูป สั่งกล่องออก
+            elif self.final_result == 'box':
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('stop')
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(13.2) #ไป ลูป สั่งขวดออก
+            else:
+                self.ControlBottle_R('up')
+                self.ControlBottle_L('stop')
+                self.play_mp3(["/home/ubuntu/Music/serve_water.mp3"])
+                self.next_step(13.2) #ไป ลูป สั่งขวดออก
+
+        elif self.mission_step == 13.1:
+            self.next_step(13.11)
+
+        elif self.mission_step == 13.11:
+            if (self.sensors.SensorCheckBoxUp == 0 or self.sensors.LimitBoxBUp == 0):
+                self.Box_Pusher('unactive')
+                self.ControlBottle_R('stop')
+                self.ControlBottle_L('stop')
+                self.Griper_R('hold')
+                self.Griper_L('hold')
+
+                time.sleep(0.01)
+                self.ControlSlide('out')
+                time.sleep(0.8)
+                self.ControlSlide('in')
+                time.sleep(0.01)
+                self.next_step(14)
+    
+        elif self.mission_step == 13.2:
+            if (self.sensors.SensorbottleR_B_UP == 0 or self.sensors.SensorbottleR_Check == 0):
+                self.Griper_R('active')
+                self.Griper_L('hold')
+                self.next_step(13.21)
+
+        elif self.mission_step == 13.21:
+            #self.Griper_R('hold')
+            #self.Griper_L('active')
+            #time.sleep(0.5)
+            self.ControlBottle_R('stop')
+            self.ControlBottle_L('stop')
+            time.sleep(0.01)
+            self.ControlSlide('out')
+            time.sleep(0.8)
+            self.Griper_R('unactive')
+            self.Griper_L('hold')
+            time.sleep(time_ungripper)
+            self.ControlSlide('in')
+            time.sleep(0.01)
+            
+            self.next_step(14)
+        
+        elif self.mission_step == 14:
+
+
+            #target_x = (self.curent_x_lift) + (+0.1)
+            #target_y = (self.curent_y_lift) + (-0.70)
+            #self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            
+
+            msg = Bool()
+            msg.data = False
+            self.ObjectDetech_EN_pub.publish(msg)
+
+
+            target_pos = manager.get_position("goto-M-OUT-1")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            self.next_step(14.01)
+
+        elif self.mission_step == 14.01:
+            if self.arrived():
+                self.next_step(14.02)
+
+        elif self.mission_step == 14.02:
+            if self.single_sensor_approach(self.right_ultrasonic_distance, direction='y-', stop_dist=0.30, slow_dist=0.40, cruise_speed=0.40, slow_speed=0.30):
+                self.next_step(14.1)
+
+        elif self.mission_step == 14.1:
+
+            #target_x = (self.curr_x) + (+0.8)
+            #target_y = self.curr_y
+            #self.go_to(target_x, target_y, 180, speed_limit=0.6, pos_x_pid=[1.7, 0.0, 0.0], yaw_pid=yaw_pid_Set)
+            
+            target_pos = manager.get_position("goto-M-OUT-2")
+            self.go_to(target_pos.x, target_pos.y, target_pos.theta, speed_limit=target_pos.speed_limit,pos_x_pid=target_pos.pos_x_pid_set,pos_y_pid=target_pos.pos_y_pid_set, yaw_pid=target_pos.yaw_pid_Set)
+
+            self.next_step(14.11)
+
+        elif self.mission_step == 14.11 and self.arrived(tol=0.1):
+            #self.go_to_curve(0.0, -0.3, speed_limit=0.6, curve_strength=0.4, curve_side='AUTO',curve_kp_=1.3)
+            self.next_step(14.111)
+
+        elif self.mission_step == 14.111 :   
+            if self.single_sensor_approach(self.right_ultrasonic_distance, direction='y-', stop_dist=0.20, slow_dist=0.20, cruise_speed=0.30, slow_speed=0.3):
+                print(f"เชคขอบไม้ลิฟ ดีเลย์ 1 วินาที") 
+                self.play_mp3(["/home/ubuntu/Music/liftdown.mp3"])
+                #self.play_mp3(["/home/ubuntu/Music/masterwait.mp3"])
+                time.sleep(time_LiftDW)
                 self.next_step(14.12)
         
         elif self.mission_step == 14.12:   
@@ -1927,12 +5445,14 @@ class SudSakhonMainController(Node):
         # คำสั่งนี้อยู่นอกสุดของ if-elif block เพื่อให้อัปเดตมอเตอร์ตลอดเวลา
 
 
+
+
     def control_loop(self):
 
 
-        #print(f"L = '{self.Lidar_left_dist}' : C = '{self.Lidar_center_dist}' : R = '{self.Lidar_right_dist}'")
+        #print(f"L = '{self.SensorCheckTable_L}' : R = '{self.SensorCheckTable_R}'")
 
-        Lidar_stop_dist = 0.18
+        #Lidar_stop_dist = 0.18
 
         step_msg = Float32()
         step_msg.data = float(self.mission_step)
@@ -1944,42 +5464,56 @@ class SudSakhonMainController(Node):
                     self.game_seleclted = "GameRed_1"
                 if self.ProgramGame == 2:
                     self.game_seleclted = "GameRed_2"
+                if self.ProgramGame == 3:
+                    self.game_seleclted = "GameRed_3"
                     
             elif self.Programcolor == self.ColorBlue:
                 if self.ProgramGame == 1:
                     self.game_seleclted = "GameBlue_1"
                 if self.ProgramGame == 2:
                     self.game_seleclted = "GameBlue_2"
+                if self.ProgramGame == 3:
+                    self.game_seleclted = "GameBlue_3"
 
         if(self.game_seleclted != self.game_seleclted_old):
             if self.game_seleclted == "GameRed_1":
                 self.play_mp3(["/home/ubuntu/Music/Red.mp3"])
             elif self.game_seleclted == "GameRed_2":
                 self.play_mp3(["/home/ubuntu/Music/Red.mp3"])
+            elif self.game_seleclted == "GameRed_3":
+                self.play_mp3(["/home/ubuntu/Music/Red.mp3"])
             elif self.game_seleclted == "GameBlue_1":
                 self.play_mp3(["/home/ubuntu/Music/Blue.mp3"])
             elif self.game_seleclted == "GameBlue_2":
+                self.play_mp3(["/home/ubuntu/Music/Blue.mp3"])
+            elif self.game_seleclted == "GameBlue_3":
                 self.play_mp3(["/home/ubuntu/Music/Blue.mp3"])
 
             print(f"Select Game : {self.game_seleclted}" )
             self.game_seleclted_old = self.game_seleclted
 
+    
+        # if self.game_seleclted == "GameRed_1":
+        #     self.Program_red_1() #normal red
 
-        if self.game_seleclted == "GameRed_1":
-            self.Program_red_1()
-
-        #elif self.game_seleclted == "GameRed_2":
-        #    self.Program_red_2()
+        elif self.game_seleclted == "GameRed_3":
+            self.Program_red_3()
         
-        elif self.game_seleclted == "GameBlue_1":
-            self.Program_blue_1()
+        # elif self.game_seleclted == "GameBlue_1":
+        #     self.Program_blue_2()   #normal blue
 
-        elif self.game_seleclted == "GameBlue_2":
-            if self.mission_step == 0:
-                if self.sensors.SW_1 == 0 or self.ProgramCommand == self.ProgramCommand_Start:
-                    if self.lidar_approach(self.Lidar_center_dist, direction='x+', stop_dist=Lidar_stop_dist, slow_dist=0.45, cruise_speed=0.35, slow_speed=0.08):
-                
-                        print("OK")
+        # elif self.game_seleclted == "GameBlue_1":
+        #     self.Program_blue_3() #kill BRR
+
+        #elif self.game_seleclted == "GameBlue_2":
+            #self.Program_blue_2()
+            #self.next_step(11.2)
+
+            #if self.mission_step == 0:
+            #    if self.sensors.SW_1 == 0 or self.ProgramCommand == self.ProgramCommand_Start:
+            #        if self.lidar_approach(self.Lidar_center_dist, direction='x+', stop_dist=Lidar_stop_dist, slow_dist=0.45, cruise_speed=0.35, slow_speed=0.08):
+            #    
+            #            print("OK")
         
         self.publish_wheelcontrol()
 
@@ -1988,10 +5522,11 @@ class SudSakhonMainController(Node):
     # ════════════════════════════════════════════════════════════════════════════
 
     def ultrasonic_callback(self, msg):
-        if len(msg.data) >= 2:
+        if len(msg.data) >= 4:
             self.left_ultrasonic_distance = msg.data[0] / 100.0  # สมมติว่าเซ็นเซอร์ส่งค่ามาเป็นเซนติเมตร เราแปลงเป็นเมตร
             self.right_ultrasonic_distance = msg.data[1] / 100.0  
-            
+            self.SensorCheckTable_L = (msg.data[3])
+            self.SensorCheckTable_R = (msg.data[2])
             # ปริ้นท์ค่าออกมาดู (.2f คือให้แสดงทศนิยม 2 ตำแหน่ง)
             #self.get_logger().info(f'Left: {self.left_ultrasonic_distance:.2f} cm | Right: {self.right_ultrasonic_distance:.2f} cm')
         else:
@@ -2006,12 +5541,12 @@ class SudSakhonMainController(Node):
         self.Programcolor = msg.data
         # print(f"Program Color set to: {self.Programcolor}")
         if(self.Programcolor == self.ColorRed):
-            self.send_parameters(0.15, 1.2, 0.5, 0.05, 180.0, 270.0)
+            self.send_parameters(0.15, 2.0, 0.5, 0.05, 180.0, 270.0)
             self.mission_step = 0
             print(f"Program Color set to: Red")
         elif(self.Programcolor == self.ColorBlue):
             #self.send_parameters(0.15, 1.2, 0.5, 0.05, 270.0, 359.0)
-            self.send_parameters(0.15, 1.2, 0.5, 0.05, 90.0, 180.0)
+            self.send_parameters(0.15, 2.0, 0.5, 0.05, 90.0, 180.0)
             self.mission_step = 0
             print(f"Program Color set to: Blue")
     def program_game_callback(self, msg): self.ProgramGame = msg.data
@@ -2029,7 +5564,7 @@ class SudSakhonMainController(Node):
         yaw = math.atan2(2.0*(q.w*q.z + q.x*q.y), 1.0 - 2.0*(q.y*q.y + q.z*q.z))
         self.go_to(msg.pose.position.x, msg.pose.position.y, math.degrees(yaw), pos_x_pid=[12.5, 0.01, 1.2], yaw_pid=[500.0, 0.0, 25.0])
 
-    def filter_callback(self, msg):
+    def filter_callback_old(self, msg):
         self.last_scan = msg
         marker = Marker()
         marker.header = msg.header
@@ -2054,6 +5589,55 @@ class SudSakhonMainController(Node):
                     p.x = dist * np.cos(rad)
                     p.y = dist * np.sin(rad)
                     marker.points.append(p)
+        self.marker_pub.publish(marker)
+
+    def filter_callback(self, msg):
+        self.last_scan = msg
+        marker = Marker()
+        marker.header = msg.header
+        marker.type = Marker.SPHERE_LIST
+        marker.scale.x = marker.scale.y = 0.05
+        marker.scale.z = 0.1
+        marker.color.a = 1.0
+        marker.color.g = 1.0 # สีเขียว
+        
+        # --- 1. รักษาระบบเดิม: เก็บค่า 40, -40, 0, 180 องศา แบบเจาะจง ---
+        for deg in [40, -40, 0, 180]:
+            rad = np.deg2rad(deg)
+            idx = int((rad - msg.angle_min) / msg.angle_increment)
+            if 0 <= idx < len(msg.ranges):
+                dist = msg.ranges[idx]
+                if np.isfinite(dist):
+                    if deg ==  40: self.Lidar_left_dist   = dist
+                    if deg == -40: self.Lidar_right_dist  = dist
+                    if deg ==   0: self.Lidar_center_dist = dist
+                    if deg == 180: self.Lidar_back_dist   = dist
+
+        # --- 2. 🌟 [อัปเกรด] กวาดเก็บจุดทั้งหมดเพื่อนำไปสร้าง "เส้นตรงขอบโต๊ะ" ---
+        front_points = []
+        
+        # กำหนดช่วงองศาที่เราสนใจกวาดจุด (ตามที่คุณตั้งซ้าย-ขวาไว้ที่ 40 และ -40 องศา)
+        angle_limit = np.deg2rad(40.0) 
+        
+        for idx, dist in enumerate(msg.ranges):
+            # กรองค่าขยะ (inf) และระยะที่อยู่นอกระยะทำงานของ LiDAR
+            if np.isfinite(dist) and msg.range_min < dist < msg.range_max:
+                angle = msg.angle_min + (idx * msg.angle_increment)
+                
+                # สนใจเฉพาะจุดที่อยู่ในช่วงมุม -40 ถึง +40 องศา
+                if -angle_limit <= angle <= angle_limit:
+                    x = dist * np.cos(angle)
+                    y = dist * np.sin(angle)
+                    front_points.append((x, y))
+                    
+                    # นำจุดที่กวาดได้มาแสดงผลเป็น Marker (ใน RViz จะเห็นจุดต่อกันเป็นเส้นโต๊ะ)
+                    p = Point()
+                    p.x = x
+                    p.y = y
+                    marker.points.append(p)
+                    
+        # เซฟกลุ่มจุด (Point Cloud) ทั้งหมดไปให้ lidar_approach ใช้งาน
+        self.front_lidar_points = front_points
         self.marker_pub.publish(marker)
 
     # ══════════════════════════════════════════════════════════════════════════

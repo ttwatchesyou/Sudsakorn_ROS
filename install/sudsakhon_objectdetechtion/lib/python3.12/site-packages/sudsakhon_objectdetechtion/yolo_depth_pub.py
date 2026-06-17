@@ -404,7 +404,8 @@ class YoloDepthPublisher(Node):
         # ── 1. Hardware / paths ────────────────────────────────────
         self.declare_parameter("openni_lib_path", "")          # path ของ libOpenNI2 (ถ้าไม่ได้ default)
         self.declare_parameter("camera_index",    0)            # index กล้อง RGB (ls /dev/video*)
-        self.declare_parameter("model_path",      "/home/ubuntu/oldmodel/best500.pt")
+        #self.declare_parameter("model_path",      "/home/ubuntu/oldmodel/best500.pt")
+        self.declare_parameter("model_path",      "/home/ubuntu/oldmodel/new/best.pt")
 
         # ── 2. Camera resolution & FPS ────────────────────────────
         self.declare_parameter("frame_width",  640)

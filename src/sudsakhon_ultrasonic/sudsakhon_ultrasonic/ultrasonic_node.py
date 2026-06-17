@@ -27,9 +27,9 @@ class UltrasonicNode(Node):
                 line = self.serial_port.readline().decode('utf-8').strip()
                 data = line.split(',')
                 
-                if len(data) == 2:
+                if len(data) == 4:
                     msg = Float32MultiArray()
-                    msg.data = [float(data[0]), float(data[1])]
+                    msg.data = [float(data[0]), float(data[1]), float(data[2]), float(data[3])]
                     
                     self.publisher_.publish(msg)
             except Exception as e:
